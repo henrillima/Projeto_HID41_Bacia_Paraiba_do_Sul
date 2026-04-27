@@ -115,6 +115,24 @@ export const TIPO_SERIE_LABELS: Record<TipoSerie, string> = {
 
 export const MES_ABREV = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
+export interface EstacaoCandidata {
+  codigo: string;
+  inicio: number | null;
+  fim: number | null;
+  anos_bons: number;
+  pct_falhas: number;
+}
+
+export interface ConfigEstacao {
+  codigo: string;
+  nome: string;
+  lat: number | null;
+  lon: number | null;
+  altitude: number | null;
+  is_referencia: boolean;
+  selecionado_em?: string;
+}
+
 export interface EstacaoSemDados {
   codigo: string;
   nome_arquivo: string;

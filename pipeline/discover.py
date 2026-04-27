@@ -195,6 +195,31 @@ def registrar_no_supabase(vazios: list[dict]) -> None:
     console.print(f"[green]{n} estacoes sem dados registradas no Supabase.[/green]")
 
 
+def exportar_candidatas(df: pd.DataFrame) -> None:
+    """Exporta todas as estações com dados para a tabela estacoes_candidatas no Supabase."""
+    load_dotenv()
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_KEY")
+    if not url or not key:
+        console.print("[red]SUPABASE_URL ou SUPABASE_SERVICE_KEY nao definidos no .env[/red]")
+        return
+    from src.supabase_loader import get_client
+    client = get_client(url, key)
+
+    registros = [
+        {
+            "codigo":     str(row["codigo"]),
+            "inicio":     int(row["inicio"]) if str(row["inicio"]).isdigit() else None,
+            "fim":        int(row["fim"]) if str(row["fim"]).isdigit() else None,
+            "anos_bons":  int(row["anos_bons"]),
+            "pct_falhas": float(row["pct_falhas"]),
+        }
+        for _, row in df.iterrows()
+    ]
+    client.table("estacoes_candidatas").upsert(registros).execute()
+    console.print(f"[green]{len(registros)} estacoes exportadas para estacoes_candidatas.[/green]")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Descobre e avalia estacoes pluviometricas nos ZIPs baixados."
@@ -204,6 +229,8 @@ def main() -> None:
                         help="Filtra estacoes com pelo menos N anos bons (default: 0)")
     parser.add_argument("--registrar", action="store_true",
                         help="Grava estacoes sem dados no Supabase (requer .env)")
+    parser.add_argument("--exportar-candidatas", action="store_true",
+                        help="Exporta ranking completo para estacoes_candidatas no Supabase (requer .env)")
     args = parser.parse_args()
 
     # Detecta ZIPs vazios antes de parsear os válidos
@@ -224,6 +251,9 @@ def main() -> None:
 
     if args.registrar and vazios:
         registrar_no_supabase(vazios)
+
+    if args.exportar_candidatas and not df.empty:
+        exportar_candidatas(df)
 
 
 if __name__ == "__main__":

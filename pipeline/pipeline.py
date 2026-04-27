@@ -1,16 +1,17 @@
 """
 Orquestrador principal do pipeline de dados pluviométricos.
 
-Sequência de execução:
-  1. Carrega config.yaml e .env
-  2. Parseia os ZIPs de cada estação configurada
-  3. Monta DataFrame pivot (index=data, colunas=estações)
-  4. Aplica preenchimento de falhas (regressão + IDW) na estação de referência
-  5. Escolhe método vencedor (menor RMSE no holdout)
-  6. Constrói séries agregadas (mensal, anual, máx. diária anual)
-  7. Calcula histogramas e estatísticas descritivas
-  8. Carrega tudo no Supabase (limpa + insere — idempotente)
-  9. Imprime sumário final
+Lê a seleção de estações da tabela config_estacoes no Supabase (preenchida
+via UI do dashboard), processa cada estação e salva todos os resultados.
+
+Sequência:
+  1. Lê config_estacoes do Supabase (estações com lat/lon configurados)
+  2. Parseia os ZIPs locais de cada estação
+  3. Aplica preenchimento de falhas (regressão + IDW) em TODAS as estações
+  4. Escolhe método vencedor por estação (menor RMSE no holdout)
+  5. Constrói séries mensais, anuais e de máx. diária anual
+  6. Calcula histogramas e estatísticas descritivas
+  7. Carrega tudo no Supabase (idempotente)
 
 Uso:
   cd pipeline
@@ -28,7 +29,6 @@ import pandas as pd
 import yaml
 from dotenv import load_dotenv
 
-# Garante que src/ está no caminho
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.gap_filling import comparar_metodos, fill_idw, fill_regressao_multipla
@@ -47,9 +47,6 @@ from src.supabase_loader import (
     upsert_estacao,
 )
 
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -58,29 +55,32 @@ logging.basicConfig(
 logger = logging.getLogger("pipeline")
 
 RAW_DATA_DIR = Path(__file__).parent / "data" / "raw"
-CONFIG_FILE = Path(__file__).parent / "config.yaml"
+CONFIG_FILE  = Path(__file__).parent / "config.yaml"
 
 
-def load_config() -> dict:
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+def load_processing_params() -> dict:
+    """Lê apenas os parâmetros de processamento do config.yaml (não as estações)."""
+    if CONFIG_FILE.exists():
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+        return cfg.get("processamento", {})
+    return {}
 
 
 def find_zip(codigo: str) -> Path:
-    """Procura o ZIP da estação em data/raw/ por código."""
-    candidates = list(RAW_DATA_DIR.glob(f"*{codigo}*.zip")) + list(RAW_DATA_DIR.glob(f"{codigo}.zip"))
+    candidates = (
+        list(RAW_DATA_DIR.glob(f"*{codigo}*.zip")) +
+        list(RAW_DATA_DIR.glob(f"{codigo}.zip"))
+    )
     if not candidates:
         raise FileNotFoundError(
-            f"ZIP para estação {codigo} não encontrado em {RAW_DATA_DIR}.\n"
-            f"Baixe o arquivo do Hidroweb e coloque em: {RAW_DATA_DIR}"
+            f"ZIP para estação {codigo} não encontrado em {RAW_DATA_DIR}."
         )
     return candidates[0]
 
 
 def main() -> None:
-    # 1. Configuração
     load_dotenv(Path(__file__).parent / ".env")
-    cfg = load_config()
 
     url = os.environ.get("SUPABASE_URL")
     key = os.environ.get("SUPABASE_SERVICE_KEY")
@@ -90,203 +90,221 @@ def main() -> None:
 
     client = get_client(url, key)
 
-    proc = cfg["processamento"]
-    max_falhas = proc["max_falhas_pct"]
-    n_bins = proc["histograma_bins"]
-    holdout_pct = proc["holdout_pct_validacao"]
-    rng_seed = proc["random_state"]
-    idw_exp = proc["idw_expoente"]
-    batch_size = proc["supabase_batch_size"]
+    # Parâmetros de processamento (do config.yaml)
+    proc = load_processing_params()
+    max_falhas   = proc.get("max_falhas_pct", 5.0)
+    n_bins       = proc.get("histograma_bins", 30)
+    holdout_pct  = proc.get("holdout_pct_validacao", 0.10)
+    rng_seed     = proc.get("random_state", 42)
+    idw_exp      = proc.get("idw_expoente", 2)
+    batch_size   = proc.get("supabase_batch_size", 500)
 
-    estacoes_cfg: list[dict] = cfg["estacoes"]
+    # Lê seleção de estações do Supabase (somente com lat/lon preenchidos)
+    rows = client.table("config_estacoes").select("*").execute().data
+    estacoes_cfg = [r for r in rows if r.get("lat") and r.get("lon")]
+
+    if len(estacoes_cfg) < 2:
+        logger.error(
+            f"Apenas {len(estacoes_cfg)} estação(ões) configurada(s) com coordenadas. "
+            "Configure ao menos 2 no painel /selecao do dashboard."
+        )
+        sys.exit(1)
+
     codigos = [e["codigo"] for e in estacoes_cfg]
-    est_ref_cfg = next(e for e in estacoes_cfg if e.get("is_referencia"))
-    codigo_ref = est_ref_cfg["codigo"]
-    codigos_aux = [c for c in codigos if c != codigo_ref]
-
-    coords = {e["codigo"]: (e["lat"], e["lon"]) for e in estacoes_cfg}
+    coords  = {e["codigo"]: (float(e["lat"]), float(e["lon"])) for e in estacoes_cfg}
+    ref_cfg = next((e for e in estacoes_cfg if e.get("is_referencia")), estacoes_cfg[0])
+    codigo_ref = ref_cfg["codigo"]
 
     logger.info("=" * 60)
-    logger.info(f"PIPELINE: {cfg['projeto']['nome']}")
+    logger.info(f"PIPELINE — Bacia do Paraíba do Sul")
     logger.info(f"Estações: {codigos}")
-    logger.info(f"Referência: {codigo_ref} | Auxiliares: {codigos_aux}")
+    logger.info(f"Referência: {codigo_ref}")
     logger.info("=" * 60)
 
-    # 2. Parse dos ZIPs
+    # Parse dos ZIPs
     series_diarias: dict[str, pd.DataFrame] = {}
-    metas: dict[str, dict] = {}
+    for est in estacoes_cfg:
+        codigo = est["codigo"]
+        try:
+            zip_path = find_zip(codigo)
+            _, df_daily = parse_ana_zip(zip_path)
+            series_diarias[codigo] = df_daily
+            logger.info(f"[parse] {codigo}: {len(df_daily)} dias")
+        except Exception as e:
+            logger.error(f"[parse] {codigo}: {e}")
+            sys.exit(1)
 
-    for est_cfg in estacoes_cfg:
-        codigo = est_cfg["codigo"]
-        zip_path = find_zip(codigo)
-        meta, df_daily = parse_ana_zip(zip_path)
-        metas[codigo] = meta
-        series_diarias[codigo] = df_daily
+    # Pivot (index=data, colunas=codigos)
+    df_pivot = pd.DataFrame({
+        codigo: df.set_index("data")["valor"].pipe(lambda s: s[~s.index.duplicated(keep="last")])
+        for codigo, df in series_diarias.items()
+    })
+    logger.info(f"Pivot: {len(df_pivot)} dias ({df_pivot.index.min().date()} → {df_pivot.index.max().date()})")
 
-    # 3. Pivot (index=data, cols=codigos)
-    df_pivot_parts = {}
-    for codigo, df in series_diarias.items():
-        s = df.set_index("data")["valor"]
-        # Garante índice contínuo de datas
-        s = s[~s.index.duplicated(keep="last")]
-        df_pivot_parts[codigo] = s
+    # Preenchimento de falhas para TODAS as estações
+    resultados: dict[str, dict] = {}
 
-    df_pivot = pd.DataFrame(df_pivot_parts)
-    data_min = df_pivot.index.min()
-    data_max = df_pivot.index.max()
-    logger.info(f"Pivot: {len(df_pivot)} dias ({data_min.date()} → {data_max.date()})")
+    for est in estacoes_cfg:
+        codigo = est["codigo"]
+        aux    = [c for c in codigos if c != codigo]
 
-    # 4. Preenchimento de falhas na estação de referência
-    logger.info(f"\n--- Preenchimento de falhas: {codigo_ref} ---")
-    resultado_reg = fill_regressao_multipla(
-        df_pivot, codigo_ref, codigos_aux,
-        holdout_pct=holdout_pct, random_state=rng_seed,
-    )
-    resultado_idw = fill_idw(
-        df_pivot, codigo_ref, codigos_aux, coords,
-        expoente=idw_exp, holdout_pct=holdout_pct, random_state=rng_seed,
-    )
-    comparacao = comparar_metodos(resultado_reg, resultado_idw)
-    metodo_vencedor = comparacao["melhor_metodo"]
+        logger.info(f"\n--- Preenchimento: {codigo} | auxiliares: {aux} ---")
+        try:
+            res_reg = fill_regressao_multipla(df_pivot, codigo, aux, holdout_pct, rng_seed)
+            res_idw = fill_idw(df_pivot, codigo, aux, coords, idw_exp, holdout_pct, rng_seed)
+        except Exception as e:
+            logger.warning(f"[{codigo}] Preenchimento falhou: {e} — mantendo série original")
+            resultados[codigo] = {"vencedor": None, "reg": None, "idw": None}
+            continue
 
-    # 5. Série final da referência com preenchimento aplicado
-    if metodo_vencedor == "regressao":
-        serie_ref_final = resultado_reg["serie_preenchida"]
-        mascara_preench = resultado_reg["mascara_preenchidos"]
-    else:
-        serie_ref_final = resultado_idw["serie_preenchida"]
-        mascara_preench = resultado_idw["mascara_preenchidos"]
+        comp     = comparar_metodos(res_reg, res_idw)
+        vencedor = comp["melhor_metodo"]
 
-    # Atualiza o pivot com os valores preenchidos
-    df_pivot[codigo_ref] = serie_ref_final
+        # Aplica vencedor ao pivot
+        if vencedor == "regressao":
+            df_pivot[codigo] = res_reg["serie_preenchida"]
+            mascara = res_reg["mascara_preenchidos"]
+        else:
+            df_pivot[codigo] = res_idw["serie_preenchida"]
+            mascara = res_idw["mascara_preenchidos"]
 
-    # 6. Constrói séries agregadas para cada estação
-    logger.info("\n--- Construindo séries agregadas ---")
-    series_mensais: dict[str, pd.DataFrame] = {}
-    series_anuais: dict[str, pd.DataFrame] = {}
-    series_max_anual: dict[str, pd.DataFrame] = {}
+        resultados[codigo] = {
+            "vencedor": vencedor,
+            "reg": res_reg,
+            "idw": res_idw,
+            "comp": comp,
+            "mascara": mascara,
+        }
+
+    # Séries agregadas e histogramas
+    logger.info("\n--- Construindo séries agregadas e histogramas ---")
+    series_mensais:  dict[str, pd.DataFrame] = {}
+    series_anuais:   dict[str, pd.DataFrame] = {}
+    series_max:      dict[str, pd.DataFrame] = {}
+    histogramas:     dict[str, dict]         = {}
 
     for codigo in codigos:
-        # Recompõe série diária a partir do pivot (inclui valores preenchidos)
+        res      = resultados[codigo]
+        mascara  = res.get("mascara", pd.Series(False, index=df_pivot.index))
+        vencedor = res.get("vencedor")
+
         df_d = pd.DataFrame({
             "estacao_codigo": codigo,
-            "data": df_pivot.index,
-            "valor": df_pivot[codigo].values,
-            "preenchido": mascara_preench.values if codigo == codigo_ref else False,
-            "metodo": metodo_vencedor if codigo == codigo_ref else None,
-            "consistencia": series_diarias[codigo].set_index("data")["consistencia"].reindex(df_pivot.index).values,
+            "data":       df_pivot.index,
+            "valor":      df_pivot[codigo].values,
+            "preenchido": mascara.values if hasattr(mascara, "values") else False,
+            "metodo":     vencedor,
+            "consistencia": (
+                series_diarias[codigo]
+                .set_index("data")["consistencia"]
+                .reindex(df_pivot.index)
+                .values
+            ),
         })
 
         series_mensais[codigo] = build_monthly(df_d, max_falhas_pct=max_falhas)
-        series_anuais[codigo] = build_annual(series_mensais[codigo], max_falhas_pct=max_falhas)
-        series_max_anual[codigo] = build_max_daily_annual(df_d)
+        series_anuais[codigo]  = build_annual(series_mensais[codigo], max_falhas_pct=max_falhas)
+        series_max[codigo]     = build_max_daily_annual(df_d)
 
-    # 7. Histogramas e estatísticas
-    logger.info("\n--- Calculando histogramas e estatísticas ---")
-    histogramas_resultado: dict[str, dict[str, dict]] = {}
-
-    for codigo in codigos:
-        df_d = pd.DataFrame({
-            "data": df_pivot.index,
-            "valor": df_pivot[codigo].values,
-        })
-
-        hist_diaria = histograma_com_estatisticas(df_d["valor"], n_bins)
-
+        s_diaria = pd.Series(df_pivot[codigo].values)
         s_mensal = pd.Series(
             series_mensais[codigo].loc[series_mensais[codigo]["valido"], "valor"].values
         )
-        hist_mensal = histograma_com_estatisticas(s_mensal, n_bins)
-
         s_anual = pd.Series(
             series_anuais[codigo].loc[series_anuais[codigo]["valido"], "valor"].values
         )
-        hist_anual = histograma_com_estatisticas(s_anual, n_bins)
+        s_max_v = pd.Series(series_max[codigo]["valor"].values)
 
-        s_max = pd.Series(series_max_anual[codigo]["valor"].values)
-        hist_max = histograma_com_estatisticas(s_max, n_bins)
-
-        histogramas_resultado[codigo] = {
-            "diaria": hist_diaria,
-            "mensal": hist_mensal,
-            "anual": hist_anual,
-            "max_diaria_anual": hist_max,
+        histogramas[codigo] = {
+            "diaria":           histograma_com_estatisticas(s_diaria, n_bins),
+            "mensal":           histograma_com_estatisticas(s_mensal, n_bins),
+            "anual":            histograma_com_estatisticas(s_anual, n_bins),
+            "max_diaria_anual": histograma_com_estatisticas(s_max_v, n_bins),
         }
 
-    # 8. Carga no Supabase
-    logger.info("\n--- Carregando dados no Supabase ---")
-    totais: dict[str, int] = {}
+    # Carga no Supabase
+    logger.info("\n--- Carregando no Supabase ---")
 
-    for est_cfg in estacoes_cfg:
-        codigo = est_cfg["codigo"]
+    for est in estacoes_cfg:
+        codigo   = est["codigo"]
+        res      = resultados[codigo]
+        mascara  = res.get("mascara", pd.Series(False, index=df_pivot.index))
+        vencedor = res.get("vencedor")
+
         logger.info(f"\n[{codigo}] Limpando dados anteriores...")
         limpar_estacao(client, codigo)
 
-        # Metadados enriquecidos com estatísticas calculadas
-        df_d_orig = series_diarias[codigo]
-        n_dias_total = len(df_d_orig)
-        n_com_dado = int(df_d_orig["valor"].notna().sum())
-        pct_falhas_orig = round(100.0 * (1 - n_com_dado / n_dias_total), 2) if n_dias_total else 0.0
+        df_orig      = series_diarias[codigo]
+        n_total      = len(df_orig)
+        n_com_dado   = int(df_orig["valor"].notna().sum())
+        pct_orig     = round(100.0 * (1 - n_com_dado / n_total), 2) if n_total else 0.0
 
-        # Pós-preenchimento (somente referência muda)
-        if codigo == codigo_ref:
-            n_com_dado_pos = n_com_dado + resultado_reg["n_preenchidos"] if metodo_vencedor == "regressao" else n_com_dado + resultado_idw["n_preenchidos"]
-            pct_falhas_pos = round(100.0 * (1 - n_com_dado_pos / n_dias_total), 2) if n_dias_total else 0.0
-        else:
-            pct_falhas_pos = pct_falhas_orig
-
-        anos_dados = len(series_anuais[codigo])
+        n_preench = 0
+        if res.get("reg") and vencedor:
+            n_preench = res["reg"]["n_preenchidos"] if vencedor == "regressao" else res["idw"]["n_preenchidos"]
+        pct_pos = round(100.0 * (1 - (n_com_dado + n_preench) / n_total), 2) if n_total else 0.0
 
         upsert_estacao(client, {
-            "codigo": codigo,
-            "nome": est_cfg.get("nome", metas[codigo].get("NomeEstacao", codigo)),
-            "lat": est_cfg["lat"],
-            "lon": est_cfg["lon"],
-            "altitude": est_cfg.get("altitude"),
-            "is_referencia": bool(est_cfg.get("is_referencia", False)),
-            "anos_dados": anos_dados,
-            "n_dias_total": n_dias_total,
-            "n_dias_com_dado": n_com_dado,
-            "pct_falhas_original": pct_falhas_orig,
-            "pct_falhas_pos_preenchimento": pct_falhas_pos,
-            "data_inicio": df_d_orig["data"].min().date().isoformat(),
-            "data_fim": df_d_orig["data"].max().date().isoformat(),
+            "codigo":                      codigo,
+            "nome":                        est.get("nome") or codigo,
+            "lat":                         float(est["lat"]),
+            "lon":                         float(est["lon"]),
+            "altitude":                    est.get("altitude"),
+            "is_referencia":               bool(est.get("is_referencia", False)),
+            "anos_dados":                  len(series_anuais[codigo]),
+            "n_dias_total":                n_total,
+            "n_dias_com_dado":             n_com_dado,
+            "pct_falhas_original":         pct_orig,
+            "pct_falhas_pos_preenchimento": pct_pos,
+            "data_inicio":                 df_orig["data"].min().date().isoformat(),
+            "data_fim":                    df_orig["data"].max().date().isoformat(),
         })
 
-        # Série diária
-        df_d = pd.DataFrame({
-            "data": df_pivot.index,
-            "valor": df_pivot[codigo].values,
-            "preenchido": mascara_preench.values if codigo == codigo_ref else False,
-            "metodo": metodo_vencedor if codigo == codigo_ref else None,
-            "consistencia": df_d_orig.set_index("data")["consistencia"].reindex(df_pivot.index).values,
+        df_d_insert = pd.DataFrame({
+            "data":       df_pivot.index,
+            "valor":      df_pivot[codigo].values,
+            "preenchido": mascara.values if hasattr(mascara, "values") else False,
+            "metodo":     vencedor,
+            "consistencia": (
+                df_orig.set_index("data")["consistencia"]
+                .reindex(df_pivot.index)
+                .values
+            ),
         })
-        n_d = insert_serie_diaria(client, codigo, df_d, batch_size)
-        n_m = insert_serie_mensal(client, codigo, series_mensais[codigo], batch_size)
-        n_a = insert_serie_anual(client, codigo, series_anuais[codigo], batch_size)
-        n_mx = insert_max_diaria_anual(client, codigo, series_max_anual[codigo], batch_size)
 
-        # Histogramas
-        for tipo, dados in histogramas_resultado[codigo].items():
+        insert_serie_diaria(client, codigo, df_d_insert, batch_size)
+        insert_serie_mensal(client, codigo, series_mensais[codigo], batch_size)
+        insert_serie_anual(client, codigo, series_anuais[codigo], batch_size)
+        insert_max_diaria_anual(client, codigo, series_max[codigo], batch_size)
+
+        for tipo, dados in histogramas[codigo].items():
             insert_histograma(client, codigo, tipo, dados)
 
-        totais[codigo] = {"diaria": n_d, "mensal": n_m, "anual": n_a, "max_anual": n_mx}
+        if res.get("reg") and res.get("idw"):
+            insert_preenchimento(
+                client, codigo, "regressao", res["reg"],
+                is_vencedor=(vencedor == "regressao"),
+            )
+            insert_preenchimento(
+                client, codigo, "idw", res["idw"],
+                is_vencedor=(vencedor == "idw"),
+            )
 
-    # Resultados de preenchimento
-    insert_preenchimento(client, codigo_ref, "regressao", resultado_reg, is_vencedor=(metodo_vencedor == "regressao"))
-    insert_preenchimento(client, codigo_ref, "idw", resultado_idw, is_vencedor=(metodo_vencedor == "idw"))
-
-    # 9. Sumário final
+    # Sumário
     logger.info("\n" + "=" * 60)
     logger.info("SUMÁRIO FINAL")
     logger.info("=" * 60)
-    for codigo, t in totais.items():
-        logger.info(f"  {codigo}: {t['diaria']} dias | {t['mensal']} meses | {t['anual']} anos | {t['max_anual']} max_anual")
-    logger.info(f"\n  Método vencedor: {metodo_vencedor.upper()}")
-    logger.info(f"  RMSE regressão : {comparacao['rmse_regressao']:.4f} mm")
-    logger.info(f"  RMSE IDW       : {comparacao['rmse_idw']:.4f} mm")
-    logger.info(f"\n  {comparacao['justificativa']}")
-    logger.info("\nPipeline concluído com sucesso.")
+    for codigo in codigos:
+        res = resultados[codigo]
+        n_p = 0
+        if res.get("vencedor") == "regressao" and res.get("reg"):
+            n_p = res["reg"]["n_preenchidos"]
+        elif res.get("vencedor") == "idw" and res.get("idw"):
+            n_p = res["idw"]["n_preenchidos"]
+        v = res.get("vencedor", "—")
+        ref_mark = " [REF]" if codigo == codigo_ref else ""
+        logger.info(f"  {codigo}{ref_mark}: método={v} | preenchidos={n_p} dias")
+    logger.info("\nPipeline concluído.")
 
 
 if __name__ == "__main__":
