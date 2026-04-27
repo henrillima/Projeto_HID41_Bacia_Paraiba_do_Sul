@@ -1,21 +1,24 @@
 """
-Baixa automaticamente os dados pluviométricos de todas as estações
-da bacia do Paraíba do Sul via API SOAP pública da ANA.
+Baixa dados pluviométricos de estações da ANA via API SOAP pública.
 
 API usada: http://telemetriaws1.ana.gov.br/ServiceANA.asmx
   - Não requer cadastro nem autenticação
-  - Retorna XML com série histórica mensal (mesma estrutura do CSV do Hidroweb)
+  - O endpoint HidroInventario pode estar instável (500) — use --inventario como alternativa
 
-Os ZIPs gerados são 100% compatíveis com parse_ana_zip() e discover.py.
+Como obter o inventário manualmente (caso o HidroInventario esteja fora do ar):
+  1. Acesse https://www.snirh.gov.br/hidroweb/serieshistoricas
+  2. Filtros: Tipo = Pluviométrica, Estado = SP
+  3. Clique em "Exportar" e salve como inventario_SP.csv na pasta pipeline/
+  4. python download_stations.py --inventario inventario_SP.csv
 
 Uso rápido:
-  python download_stations.py                      # baixa tudo (pode demorar)
-  python download_stations.py --listar             # só lista estações, sem baixar
-  python download_stations.py --codigos 02244006 02244008  # baixa estações específicas
-  python download_stations.py --estado SP --tipo 2 # pluviométricas de SP
+  python download_stations.py --inventario inventario_SP.csv
+  python download_stations.py --inventario inventario_SP.csv --listar
+  python download_stations.py --codigos 02244006 02244008 02245000
+  python download_stations.py --estado SP   # tenta API automática
 
 Após concluir, rode:
-  python discover.py                               # avalia qualidade das estações
+  python discover.py    # avalia qualidade e ranqueia as estações
 """
 
 from __future__ import annotations
@@ -68,30 +71,62 @@ def listar_estacoes(
     Consulta o inventário da ANA e retorna um DataFrame com todas as
     estações que atendem aos filtros.
 
-    Parameters
-    ----------
-    estado   : sigla do estado (ex: 'SP'), ou '' para todos
-    tipo     : '2' = pluviométrica | '1' = fluviométrica | '' = todas
-    codigo_de/ate : faixa de códigos (8 dígitos) para filtrar por bacia
-    nome_rio : substring do nome do rio para filtrar
+    A API da ANA retorna 500 quando recebe code range + estado juntos,
+    então enviamos apenas um filtro por vez e filtramos o restante localmente.
     """
-    params = {
-        "codEstDE":    codigo_de,
-        "codEstATE":   codigo_ate,
-        "tpEst":       tipo,
-        "nmEst":       "",
-        "nmRio":       nome_rio,
-        "codSubBacia": "",
-        "codBacia":    "",
-        "nmMunicipio": "",
-        "nmEstado":    estado,
-        "sgOperadora": "",
-        "telemetrica": "",
-    }
-    console.print(f"[blue]Consultando inventário ANA (estado={estado or 'todos'}, tipo={tipo})...[/blue]")
-    resp = requests.get(_INVENTARIO_URL, params=params, timeout=120)
-    resp.raise_for_status()
-    return _parse_inventario_xml(resp.content)
+    # Tenta sequência de chamadas do mais simples ao mais completo
+    # para contornar o comportamento errático do servidor da ANA.
+    tentativas = [
+        # 1. Só estado + tipo (mais confiável)
+        {"tpEst": tipo, "nmEstado": estado, "nmEst": "", "nmRio": nome_rio,
+         "codEstDE": "", "codEstATE": "", "codSubBacia": "", "codBacia": "",
+         "nmMunicipio": "", "sgOperadora": "", "telemetrica": ""},
+        # 2. Só código range + tipo (sem estado)
+        {"tpEst": tipo, "nmEstado": "", "nmEst": "", "nmRio": nome_rio,
+         "codEstDE": codigo_de, "codEstATE": codigo_ate, "codSubBacia": "",
+         "codBacia": "", "nmMunicipio": "", "sgOperadora": "", "telemetrica": ""},
+        # 3. Só tipo, sem nenhum filtro geográfico
+        {"tpEst": tipo, "nmEstado": "", "nmEst": "", "nmRio": "",
+         "codEstDE": "", "codEstATE": "", "codSubBacia": "", "codBacia": "",
+         "nmMunicipio": "", "sgOperadora": "", "telemetrica": ""},
+    ]
+
+    df = pd.DataFrame()
+    for i, params in enumerate(tentativas, 1):
+        desc = f"estado={params['nmEstado'] or '—'}, códigos={params['codEstDE'] or '—'}–{params['codEstATE'] or '—'}"
+        console.print(f"[blue]Tentativa {i}: consultando inventário ANA ({desc})...[/blue]")
+        try:
+            resp = requests.get(_INVENTARIO_URL, params=params, timeout=120)
+            resp.raise_for_status()
+            df = _parse_inventario_xml(resp.content)
+            if not df.empty:
+                break
+        except Exception as e:
+            console.print(f"[yellow]  Tentativa {i} falhou: {e}[/yellow]")
+
+    if df.empty:
+        return df
+
+    # Filtragem local —————————————————————————————————————————————
+    # Estado (caso a tentativa 2 ou 3 tenha sido usada)
+    if estado and "estado" in df.columns:
+        mask_estado = df["estado"].str.upper().str.contains(estado.upper(), na=False)
+        if mask_estado.any():
+            df = df[mask_estado]
+
+    # Faixa de códigos
+    if codigo_de or codigo_ate:
+        try:
+            df["_cod_num"] = pd.to_numeric(df["codigo"], errors="coerce")
+            if codigo_de:
+                df = df[df["_cod_num"] >= int(codigo_de)]
+            if codigo_ate:
+                df = df[df["_cod_num"] <= int(codigo_ate)]
+            df = df.drop(columns=["_cod_num"])
+        except Exception:
+            pass  # se falhar, mantém todos
+
+    return df.reset_index(drop=True)
 
 
 def _parse_inventario_xml(xml_bytes: bytes) -> pd.DataFrame:
@@ -284,22 +319,83 @@ def _text(node: ET.Element, tag: str) -> str:
 # CLI principal
 # ---------------------------------------------------------------------------
 
+def _ler_inventario_csv(caminho: str) -> pd.DataFrame:
+    """
+    Lê o CSV de inventário exportado pelo portal HidroWeb (snirh.gov.br).
+    Tenta detectar o separador e normaliza os nomes de coluna automaticamente.
+    """
+    path = Path(caminho)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Arquivo '{caminho}' não encontrado.\n"
+            "Exporte o inventário em: snirh.gov.br/hidroweb/serieshistoricas → Exportar"
+        )
+
+    # Detecta encoding e separador
+    for enc in ("utf-8-sig", "latin-1", "utf-8"):
+        try:
+            # Tenta ponto-e-vírgula primeiro (padrão brasileiro), depois vírgula
+            for sep in (";", ",", "\t"):
+                try:
+                    df = pd.read_csv(path, sep=sep, encoding=enc, dtype=str, nrows=5)
+                    if len(df.columns) >= 3:
+                        df = pd.read_csv(path, sep=sep, encoding=enc, dtype=str)
+                        break
+                except Exception:
+                    continue
+            break
+        except Exception:
+            continue
+
+    # Normaliza colunas — o export do HidroWeb tem nomes variados
+    col_map = {
+        # Código da estação
+        "código": "codigo", "codigo": "codigo", "codigoestacao": "codigo",
+        "cod_estacao": "codigo", "cod": "codigo",
+        # Nome
+        "nome": "nome", "nomeestacao": "nome", "estacao": "nome",
+        # Coordenadas
+        "latitude": "lat", "lat": "lat",
+        "longitude": "lon", "lon": "lon", "long": "lon",
+        # Outros
+        "altitude": "altitude", "municipio": "municipio",
+        "estado": "estado", "uf": "estado",
+        "rio": "rio", "nomeeio": "rio",
+    }
+    df.columns = [
+        col_map.get(c.lower().strip().replace(" ", "").replace("_", ""), c.lower().strip())
+        for c in df.columns
+    ]
+
+    if "codigo" not in df.columns:
+        raise ValueError(
+            f"Coluna de código não encontrada no arquivo. "
+            f"Colunas detectadas: {list(df.columns)}"
+        )
+
+    df = df[df["codigo"].notna() & df["codigo"].str.strip().ne("")]
+    console.print(f"[green]{len(df)} estações lidas de '{path.name}'[/green]")
+    return df.reset_index(drop=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Baixa dados pluviométricos da ANA (API pública, sem autenticação)."
     )
     parser.add_argument("--listar", action="store_true",
                         help="Apenas lista estações, sem baixar dados.")
+    parser.add_argument("--inventario", metavar="ARQUIVO.csv",
+                        help="CSV exportado do HidroWeb (alternativa ao HidroInventario API).")
     parser.add_argument("--codigos", nargs="+", metavar="COD",
                         help="Códigos específicos a baixar (ex: 02244006 02244008).")
     parser.add_argument("--estado", default="SP",
-                        help="Sigla do estado para filtrar (padrão: SP).")
+                        help="Sigla do estado para filtrar via API (padrão: SP).")
     parser.add_argument("--tipo", default="2",
                         help="Tipo de estação: 2=plu (padrão), 1=flu.")
     parser.add_argument("--codigo-de", default="",
-                        help="Código mínimo (faixa) para filtrar por bacia.")
+                        help="Código mínimo para filtrar localmente.")
     parser.add_argument("--codigo-ate", default="",
-                        help="Código máximo (faixa) para filtrar por bacia.")
+                        help="Código máximo para filtrar localmente.")
     parser.add_argument("--rio", default="",
                         help="Nome (ou parte) do rio para filtrar.")
     parser.add_argument("--inicio", default="01/01/1930",
@@ -316,11 +412,14 @@ def main() -> None:
 
     # --- Obter lista de estações ---
     if args.codigos:
-        # Cria DataFrame mínimo com os códigos fornecidos
         df_inv = pd.DataFrame([{"codigo": c, "nome": c, "lat": "", "lon": "",
                                  "altitude": "", "municipio": "", "estado": "",
                                  "rio": ""} for c in args.codigos])
         console.print(f"[blue]Usando {len(df_inv)} código(s) fornecido(s) manualmente.[/blue]")
+
+    elif args.inventario:
+        df_inv = _ler_inventario_csv(args.inventario)
+
     else:
         df_inv = listar_estacoes(
             estado=args.estado,
@@ -330,8 +429,26 @@ def main() -> None:
             nome_rio=args.rio,
         )
 
+    # Filtragem local por código (útil com --inventario)
+    if not df_inv.empty and (args.codigo_de or args.codigo_ate):
+        try:
+            nums = pd.to_numeric(df_inv["codigo"], errors="coerce")
+            if args.codigo_de:
+                df_inv = df_inv[nums >= int(args.codigo_de)]
+            if args.codigo_ate:
+                df_inv = df_inv[nums <= int(args.codigo_ate)]
+            df_inv = df_inv.reset_index(drop=True)
+            console.print(f"[dim]Após filtro de código: {len(df_inv)} estações.[/dim]")
+        except Exception:
+            pass
+
     if df_inv.empty:
-        console.print("[red]Nenhuma estação encontrada. Encerrando.[/red]")
+        console.print(
+            "[red]Nenhuma estação encontrada.[/red]\n"
+            "[yellow]Dica: baixe o inventário manualmente em "
+            "snirh.gov.br/hidroweb/serieshistoricas → Exportar\n"
+            "e use: python download_stations.py --inventario inventario_SP.csv[/yellow]"
+        )
         return
 
     # --- Exibe tabela do inventário ---

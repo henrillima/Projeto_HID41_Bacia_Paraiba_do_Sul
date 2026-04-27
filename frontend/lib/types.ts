@@ -114,3 +114,10 @@ export const TIPO_SERIE_LABELS: Record<TipoSerie, string> = {
 };
 
 export const MES_ABREV = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+export interface EstacaoSemDados {
+  codigo: string;
+  nome_arquivo: string;
+  motivo: string;
+  registrado_em: string;
+}

@@ -174,6 +174,19 @@ def insert_histograma(
     logger.info(f"[histograma] {codigo}/{tipo}: inserido")
 
 
+def insert_estacoes_sem_dados(client: Client, registros: list[dict]) -> int:
+    """
+    registros: lista de {'codigo': str, 'nome_arquivo': str, 'motivo': str}
+    Usa upsert para idempotência.
+    """
+    if not registros:
+        return 0
+    sanitized = [_sanitize_record(r) for r in registros]
+    client.table("estacoes_sem_dados").upsert(sanitized).execute()
+    logger.info(f"[sem_dados] {len(sanitized)} estações registradas")
+    return len(sanitized)
+
+
 def insert_preenchimento(
     client: Client,
     estacao_ref: str,

@@ -89,14 +89,17 @@ def parse_ana_zip(zip_path: Path) -> tuple[dict, pd.DataFrame]:
     logger.info(f"Abrindo ZIP: {zip_path.name}")
 
     with zipfile.ZipFile(zip_path, "r") as zf:
+        names = zf.namelist()
+        # Aceita tanto o padrão gerado pela API SOAP ("chuvas_C_*.csv")
+        # quanto o padrão do download manual do portal ("*_Chuvas.csv")
         csv_name = next(
-            (n for n in zf.namelist() if re.match(r"chuvas_C_.*\.csv$", n, re.I)),
+            (n for n in names if re.search(r"\.csv$", n, re.I)),
             None,
         )
         if csv_name is None:
             raise FileNotFoundError(
-                f"Não encontrei 'chuvas_C_*.csv' dentro de {zip_path.name}. "
-                "Verifique se o arquivo foi baixado corretamente do Hidroweb."
+                f"Nenhum arquivo .csv encontrado dentro de {zip_path.name}. "
+                f"Conteúdo: {names}"
             )
         raw_bytes = zf.read(csv_name)
 

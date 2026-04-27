@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useEstacoes } from "@/hooks/useEstacoes";
+import { useEstacoesSemDados } from "@/hooks/useEstacoesSemDados";
 import { EstacaoCard } from "@/components/EstacaoCard";
 import { KPICard } from "@/components/KPICard";
 import { fmtMm } from "@/lib/utils";
@@ -14,6 +16,8 @@ const MapaEstacoes = dynamic(
 
 export default function DashboardPage() {
   const { data: estacoes, loading } = useEstacoes();
+  const { data: semDados } = useEstacoesSemDados();
+  const [expandirSemDados, setExpandirSemDados] = useState(false);
 
   const ref = estacoes.find((e) => e.is_referencia);
   const mediaTotal = estacoes.length
@@ -90,6 +94,44 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
+
+      {/* Estações sem dados */}
+      {semDados.length > 0 && (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-slate-700">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold text-amber-800">
+                Observação sobre disponibilidade de dados ({semDados.length} estações)
+              </p>
+              <p className="mt-1 text-amber-700">
+                Ao extrair os dados da ANA Hidroweb, {semDados.length} estações
+                cadastradas no inventário retornaram ZIPs sem conteúdo — ou seja,
+                existem no cadastro mas não possuem série histórica disponível para
+                download. Esses pontos não foram descartados por decisão do grupo;
+                a ausência de dados é da fonte original.
+              </p>
+            </div>
+            <button
+              onClick={() => setExpandirSemDados((v) => !v)}
+              className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
+            >
+              {expandirSemDados ? "Ocultar" : "Ver códigos"}
+            </button>
+          </div>
+          {expandirSemDados && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {semDados.map((e) => (
+                <span
+                  key={e.codigo}
+                  className="rounded bg-amber-100 px-2 py-0.5 font-mono text-xs text-amber-800"
+                >
+                  {e.codigo}
+                </span>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Nota metodológica */}
       <section className="rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm text-slate-600">
