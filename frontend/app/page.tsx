@@ -1,153 +1,223 @@
-"use client";
+import Image from "next/image";
+import Link from "next/link";
 
-import { useState } from "react";
-import dynamic from "next/dynamic";
-import { useEstacoes } from "@/hooks/useEstacoes";
-import { useEstacoesSemDados } from "@/hooks/useEstacoesSemDados";
-import { EstacaoCard } from "@/components/EstacaoCard";
-import { KPICard } from "@/components/KPICard";
-import { fmtMm } from "@/lib/utils";
+const INTEGRANTES = [
+  { nome: "Henri Leonardo dos Santos Lima", ra: "ITA · Engenharia Civil-Aeronáutica" },
+  { nome: "Pedro Feitosa Gutemberg",        ra: "ITA · Engenharia Civil-Aeronáutica" },
+  { nome: "Gustavo Vidal Feitosa",          ra: "ITA · Engenharia Civil-Aeronáutica" },
+];
 
-// Leaflet requer SSR desabilitado
-const MapaEstacoes = dynamic(
-  () => import("@/components/MapaEstacoes").then((m) => m.MapaEstacoes),
-  { ssr: false, loading: () => <div className="h-[380px] animate-pulse rounded-xl bg-slate-100" /> }
-);
+const PAGINAS = [
+  {
+    href: "/dashboard",
+    titulo: "Dashboard",
+    descricao: "KPIs, mapa interativo e cards de cada estação selecionada.",
+    cor: "border-blue-200 bg-blue-50",
+    corTexto: "text-blue-700",
+  },
+  {
+    href: "/estacoes",
+    titulo: "Estações",
+    descricao: "Navegue pelas estações processadas com séries diárias, mensais, anuais e histogramas.",
+    cor: "border-sky-200 bg-sky-50",
+    corTexto: "text-sky-700",
+  },
+  {
+    href: "/selecao",
+    titulo: "Seleção",
+    descricao: "Interface para escolher as estações de análise, informar coordenadas e definir a referência.",
+    cor: "border-violet-200 bg-violet-50",
+    corTexto: "text-violet-700",
+  },
+  {
+    href: "/preenchimento",
+    titulo: "Preenchimento",
+    descricao: "Comparação entre regressão linear múltipla e IDW na estação de referência.",
+    cor: "border-emerald-200 bg-emerald-50",
+    corTexto: "text-emerald-700",
+  },
+  {
+    href: "/transparencia",
+    titulo: "Transparência",
+    descricao: "Documentação completa de cada etapa: coleta, construção das séries e resultados do preenchimento.",
+    cor: "border-amber-200 bg-amber-50",
+    corTexto: "text-amber-700",
+  },
+];
 
-export default function DashboardPage() {
-  const { data: estacoes, loading } = useEstacoes();
-  const { data: semDados } = useEstacoesSemDados();
-  const [expandirSemDados, setExpandirSemDados] = useState(false);
+const STACK = [
+  { cat: "Frontend",   items: ["Next.js 14 · App Router", "React 18", "TypeScript", "Tailwind CSS", "Recharts", "react-leaflet"] },
+  { cat: "Backend",    items: ["Supabase (PostgreSQL)", "Row Level Security", "Views SQL"] },
+  { cat: "Pipeline",   items: ["Python 3.11", "pandas · numpy", "scikit-learn (regressão)", "haversine (IDW)", "supabase-py"] },
+  { cat: "Deploy",     items: ["Vercel (frontend)", "Supabase Cloud (banco)"] },
+];
 
-  const ref = estacoes.find((e) => e.is_referencia);
-  const mediaTotal = estacoes.length
-    ? estacoes.reduce((s, e) => s + (e.media_anual_mm ?? 0), 0) / estacoes.length
-    : null;
-  const anosMin = estacoes.length
-    ? Math.min(...estacoes.map((e) => parseInt(e.data_inicio?.slice(0, 4) ?? "9999")))
-    : null;
-  const anosMax = estacoes.length
-    ? Math.max(...estacoes.map((e) => parseInt(e.data_fim?.slice(0, 4) ?? "0")))
-    : null;
-
+export default function HomePage() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-14">
+
       {/* Hero */}
-      <section>
-        <h1 className="text-2xl font-bold text-slate-800">
-          Análise Pluviométrica — Bacia do Paraíba do Sul
-        </h1>
-        <p className="mt-1 text-slate-500">
-          Séries históricas diárias, mensais e anuais · Preenchimento de falhas por regressão e IDW
-        </p>
-      </section>
-
-      {/* KPIs */}
-      <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <KPICard
-          titulo="Estações"
-          valor={loading ? "—" : String(estacoes.length)}
-          subtitulo="pluviométricas"
-        />
-        <KPICard
-          titulo="Período"
-          valor={loading || !anosMin ? "—" : `${anosMin}–${anosMax}`}
-          subtitulo="anos disponíveis"
-        />
-        <KPICard
-          titulo="Média anual"
-          valor={loading ? "—" : fmtMm(mediaTotal, 0)}
-          subtitulo="(todas as estações)"
-          destaque
-        />
-        <KPICard
-          titulo="Referência"
-          valor={loading ? "—" : (ref?.codigo ?? "—")}
-          subtitulo={ref?.nome ?? ""}
-        />
-      </section>
-
-      {/* Mapa */}
-      <section>
-        <h2 className="mb-3 text-base font-semibold text-slate-700">Localização das estações</h2>
-        {loading ? (
-          <div className="h-[380px] animate-pulse rounded-xl bg-slate-100" />
-        ) : (
-          <MapaEstacoes estacoes={estacoes} height="380px" />
-        )}
-      </section>
-
-      {/* Cards das estações */}
-      <section>
-        <h2 className="mb-3 text-base font-semibold text-slate-700">Estações monitoradas</h2>
-        {loading ? (
-          <div className="grid gap-4 sm:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-48 animate-pulse rounded-xl bg-slate-100" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-3">
-            {estacoes.map((e) => (
-              <EstacaoCard key={e.codigo} estacao={e} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Estações sem dados */}
-      {semDados.length > 0 && (
-        <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-slate-700">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-semibold text-amber-800">
-                Observação sobre disponibilidade de dados ({semDados.length} estações)
-              </p>
-              <p className="mt-1 text-amber-700">
-                Ao extrair os dados da ANA Hidroweb, {semDados.length} estações
-                cadastradas no inventário retornaram ZIPs sem conteúdo — ou seja,
-                existem no cadastro mas não possuem série histórica disponível para
-                download. Esses pontos não foram descartados por decisão do grupo;
-                a ausência de dados é da fonte original.
-              </p>
-            </div>
-            <button
-              onClick={() => setExpandirSemDados((v) => !v)}
-              className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
+      <section className="flex flex-col items-center gap-6 rounded-2xl border bg-white px-8 py-12 text-center shadow-sm sm:flex-row sm:text-left">
+        <div className="shrink-0">
+          <Image
+            src="/logo-ita-fundo-branco.jpg"
+            alt="Logo ITA"
+            width={120}
+            height={120}
+            className="rounded-xl"
+            priority
+          />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+            Instituto Tecnológico de Aeronáutica
+          </p>
+          <h1 className="mt-1 text-3xl font-black text-[#00205B]">
+            HID-41 — Hidrologia e Drenagem
+          </h1>
+          <p className="mt-2 text-lg font-medium text-slate-600">
+            Análise Pluviométrica · Bacia do Paraíba do Sul (URGHI 2)
+          </p>
+          <p className="mt-3 max-w-2xl text-sm text-slate-500">
+            Dashboard interativo para análise de séries históricas de precipitação de estações
+            pluviométricas da ANA Hidroweb. Contempla construção das séries diária, mensal e
+            anual, preenchimento de falhas por regressão múltipla e IDW, histogramas e
+            estatísticas descritivas completas.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2 sm:justify-start">
+            <Link
+              href="/dashboard"
+              className="rounded-lg bg-[#00205B] px-4 py-2 text-sm font-semibold text-white hover:bg-[#003087] transition-colors"
             >
-              {expandirSemDados ? "Ocultar" : "Ver códigos"}
-            </button>
+              Abrir dashboard
+            </Link>
+            <Link
+              href="/transparencia"
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              Ver metodologia
+            </Link>
           </div>
-          {expandirSemDados && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {semDados.map((e) => (
-                <span
-                  key={e.codigo}
-                  className="rounded bg-amber-100 px-2 py-0.5 font-mono text-xs text-amber-800"
-                >
-                  {e.codigo}
-                </span>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Nota metodológica */}
-      <section className="rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm text-slate-600">
-        <p className="font-semibold text-blue-800">Metodologia resumida</p>
-        <ul className="mt-2 list-inside list-disc space-y-1">
-          <li>Dados: ANA Hidroweb — séries diárias de precipitação pluviométrica.</li>
-          <li>Consistência: registros de nível 2 (consistido) priorizados sobre nível 1 (bruto).</li>
-          <li>Meses com &gt;5% de falhas marcados como inválidos nas agregações mensais/anuais.</li>
-          <li>
-            Preenchimento de falhas da estação de referência por{" "}
-            <strong>regressão linear múltipla</strong> e <strong>IDW</strong> —
-            método vencedor selecionado pelo menor RMSE em holdout de 10%.
-          </li>
-          <li>Ver página <a href="/preenchimento" className="text-blue-600 underline">Preenchimento</a> para detalhes.</li>
-        </ul>
+        </div>
       </section>
+
+      {/* Seções do dashboard */}
+      <section>
+        <h2 className="mb-4 text-lg font-bold text-slate-800">O que está disponível</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {PAGINAS.map((p) => (
+            <Link
+              key={p.href}
+              href={p.href}
+              className={`rounded-xl border p-4 transition-shadow hover:shadow-md ${p.cor}`}
+            >
+              <p className={`font-semibold ${p.corTexto}`}>{p.titulo}</p>
+              <p className="mt-1 text-sm text-slate-600">{p.descricao}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Disciplina e integrantes */}
+      <section className="grid gap-6 sm:grid-cols-2">
+        <div className="rounded-xl border bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-base font-bold text-slate-800">Disciplina</h2>
+          <dl className="space-y-2 text-sm">
+            <div className="flex gap-2">
+              <dt className="w-28 shrink-0 font-medium text-slate-500">Código</dt>
+              <dd className="text-slate-700">HID-41</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-28 shrink-0 font-medium text-slate-500">Nome</dt>
+              <dd className="text-slate-700">Hidrologia e Drenagem</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-28 shrink-0 font-medium text-slate-500">Professora</dt>
+              <dd className="text-slate-700">Danielle de Almeida Bressiani</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-28 shrink-0 font-medium text-slate-500">Instituição</dt>
+              <dd className="text-slate-700">ITA — Instituto Tecnológico de Aeronáutica</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-28 shrink-0 font-medium text-slate-500">Bacia</dt>
+              <dd className="text-slate-700">Paraíba do Sul · URGHI 2 · SP</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-28 shrink-0 font-medium text-slate-500">Fonte dos dados</dt>
+              <dd className="text-slate-700">ANA Hidroweb — séries históricas diárias</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div className="rounded-xl border bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-base font-bold text-slate-800">Integrantes do grupo</h2>
+          <div className="space-y-3">
+            {INTEGRANTES.map((p, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#00205B] text-xs font-bold text-white">
+                  {p.nome.split(" ").map((n) => n[0]).slice(0, 2).join("")}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-700">{p.nome}</p>
+                  <p className="text-xs text-slate-400">{p.ra}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Stack tecnológica */}
+      <section>
+        <h2 className="mb-4 text-lg font-bold text-slate-800">Stack tecnológica</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {STACK.map((s) => (
+            <div key={s.cat} className="rounded-xl border bg-white p-4 shadow-sm">
+              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">{s.cat}</p>
+              <ul className="space-y-1">
+                {s.items.map((item) => (
+                  <li key={item} className="flex items-center gap-1.5 text-sm text-slate-600">
+                    <span className="h-1 w-1 shrink-0 rounded-full bg-[#00205B]" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Análises realizadas */}
+      <section>
+        <h2 className="mb-4 text-lg font-bold text-slate-800">Análises realizadas</h2>
+        <div className="rounded-xl border bg-white p-6 shadow-sm">
+          <ul className="grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+            {[
+              "Download e parsing de 377 ZIPs da ANA Hidroweb",
+              "Inventário de qualidade: anos bons, % de falhas, período",
+              "Série diária com priorização do nível de consistência 2",
+              "Série mensal (meses com >5% de falhas marcados como inválidos)",
+              "Série anual (anos com qualquer mês inválido excluídos)",
+              "Precipitação máxima diária anual com data de ocorrência",
+              "Preenchimento de falhas por regressão linear múltipla",
+              "Preenchimento de falhas por IDW (distância haversine)",
+              "Validação cruzada holdout 10% com semente fixa (seed=42)",
+              "Seleção automática do método vencedor pelo menor RMSE",
+              "Histogramas de frequência para todas as séries (diária, mensal, anual, máx.)",
+              "16 estatísticas descritivas por série (média, mediana, percentis, assimetria, curtose...)",
+              "Mapa interativo das estações com react-leaflet",
+              "Documentação de 89 estações sem dados disponíveis na fonte",
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-2">
+                <span className="mt-0.5 text-emerald-500">✓</span>
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
     </div>
   );
 }

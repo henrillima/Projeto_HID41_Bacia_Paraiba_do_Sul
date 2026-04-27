@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Image from "next/image";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -7,8 +8,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "HID-41 — Análise Pluviométrica · Paraíba do Sul",
   description:
-    "Análise de séries históricas de precipitação da bacia do Paraíba do Sul. " +
-    "Disciplina HID-41 — ITA.",
+    "Dashboard de análise de séries históricas de precipitação da bacia do Paraíba do Sul. " +
+    "Disciplina HID-41 — ITA. Dados: ANA Hidroweb.",
+  icons: { icon: "/logo-ita-fundo-branco.jpg" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -26,9 +28,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Barra superior de identidade ITA */}
         <header className="border-b bg-[#00205B] text-white">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded bg-white/20 text-xs font-black">
-                ITA
+            <a href="/" className="flex items-center gap-3 hover:opacity-90">
+              <div className="rounded-lg bg-white p-0.5">
+                <Image
+                  src="/logo-ita-fundo-branco.jpg"
+                  alt="ITA"
+                  width={32}
+                  height={32}
+                  className="rounded-md"
+                />
               </div>
               <div>
                 <p className="text-sm font-bold leading-none">HID-41 · Hidrologia e Drenagem</p>
@@ -36,9 +44,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   Bacia do Paraíba do Sul — URGHI 2
                 </p>
               </div>
-            </div>
+            </a>
             <nav className="hidden gap-5 text-sm text-blue-200 sm:flex">
-              <a href="/" className="hover:text-white">Dashboard</a>
+              <a href="/" className="hover:text-white">Início</a>
+              <a href="/dashboard" className="hover:text-white">Dashboard</a>
               <a href="/estacoes" className="hover:text-white">Estações</a>
               <a href="/selecao" className="hover:text-white">Seleção</a>
               <a href="/preenchimento" className="hover:text-white">Preenchimento</a>
