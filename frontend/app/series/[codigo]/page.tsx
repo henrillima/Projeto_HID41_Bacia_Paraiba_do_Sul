@@ -58,7 +58,8 @@ export default function SeriesPage() {
     valor: d.valor,
   }));
 
-  const dadosPorTab: Record<TabKey, typeof dadosDiaria> = {
+  type PontoDado = { label: string; valor: number | null; preenchido?: boolean };
+  const dadosPorTab: Record<TabKey, PontoDado[]> = {
     diaria: dadosDiaria,
     mensal: dadosMensal,
     anual: dadosAnual,
