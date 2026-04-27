@@ -150,6 +150,18 @@ def main() -> None:
     })
     logger.info(f"Pivot: {len(df_pivot)} dias ({df_pivot.index.min().date()} → {df_pivot.index.max().date()})")
 
+    # Verifica se há coordenadas reais (lat/lon != 0) para habilitar IDW
+    coords_validas = all(
+        abs(lat) > 0.001 or abs(lon) > 0.001
+        for lat, lon in coords.values()
+    )
+    if not coords_validas:
+        logger.warning(
+            "Coordenadas não configuradas (lat=0, lon=0). "
+            "Método IDW desativado — usando apenas regressão. "
+            "Para ativar IDW, preencha lat/lon no config.yaml ou em /selecao."
+        )
+
     # Preenchimento de falhas para TODAS as estações
     resultados: dict[str, dict] = {}
 
@@ -160,22 +172,35 @@ def main() -> None:
         logger.info(f"\n--- Preenchimento: {codigo} | auxiliares: {aux} ---")
         try:
             res_reg = fill_regressao_multipla(df_pivot, codigo, aux, holdout_pct, rng_seed)
-            res_idw = fill_idw(df_pivot, codigo, aux, coords, idw_exp, holdout_pct, rng_seed)
         except Exception as e:
-            logger.warning(f"[{codigo}] Preenchimento falhou: {e} — mantendo série original")
+            logger.warning(f"[{codigo}] Regressão falhou: {e} — mantendo série original")
             resultados[codigo] = {"vencedor": None, "reg": None, "idw": None}
             continue
 
-        comp     = comparar_metodos(res_reg, res_idw)
-        vencedor = comp["melhor_metodo"]
+        res_idw = None
+        comp    = None
+
+        if coords_validas:
+            try:
+                res_idw = fill_idw(df_pivot, codigo, aux, coords, idw_exp, holdout_pct, rng_seed)
+                comp    = comparar_metodos(res_reg, res_idw)
+            except Exception as e:
+                logger.warning(f"[{codigo}] IDW falhou: {e} — usando regressão")
+                res_idw = None
+                comp    = None
+
+        if comp is not None:
+            vencedor = comp["melhor_metodo"]
+        else:
+            vencedor = "regressao"
 
         # Aplica vencedor ao pivot
         if vencedor == "regressao":
             df_pivot[codigo] = res_reg["serie_preenchida"]
             mascara = res_reg["mascara_preenchidos"]
         else:
-            df_pivot[codigo] = res_idw["serie_preenchida"]
-            mascara = res_idw["mascara_preenchidos"]
+            df_pivot[codigo] = res_idw["serie_preenchida"]  # type: ignore[index]
+            mascara = res_idw["mascara_preenchidos"]  # type: ignore[index]
 
         resultados[codigo] = {
             "vencedor": vencedor,
@@ -289,11 +314,12 @@ def main() -> None:
         for tipo, dados in histogramas[codigo].items():
             insert_histograma(client, codigo, tipo, dados)
 
-        if res.get("reg") and res.get("idw"):
+        if res.get("reg"):
             insert_preenchimento(
                 client, codigo, "regressao", res["reg"],
                 is_vencedor=(vencedor == "regressao"),
             )
+        if res.get("idw"):
             insert_preenchimento(
                 client, codigo, "idw", res["idw"],
                 is_vencedor=(vencedor == "idw"),

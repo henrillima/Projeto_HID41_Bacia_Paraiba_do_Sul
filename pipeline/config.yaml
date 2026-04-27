@@ -1,46 +1,35 @@
 projeto:
-  nome: "Análise Pluviométrica — Bacia do Paraíba do Sul"
-  bacia: "Paraíba do Sul (cabeceira – URGHI 2, SP)"
-  disciplina: "HID-41: Hidrologia e Drenagem"
-  instituicao: "ITA – Instituto Tecnológico de Aeronáutica"
+  nome: Análise Pluviométrica — Bacia do Paraíba do Sul
+  bacia: Paraíba do Sul (cabeceira – URGHI 2, SP)
+  disciplina: 'HID-41: Hidrologia e Drenagem'
+  instituicao: ITA – Instituto Tecnológico de Aeronáutica
   grupo:
-    - "Henri Leonardo dos Santos Lima"
-    - "Pedro Feitosa Gutemberg"
-    - "Gustavo Vidal Feitosa"
-
-# Preencha com as estações escolhidas pelo discover.py
-# Dica: lat/lon disponíveis em hidroweb.ana.gov.br buscando pelo código
-# is_referencia: true em APENAS UMA (a com mais anos bons)
+  - Henri Leonardo dos Santos Lima
+  - Pedro Feitosa Gutemberg
+  - Gustavo Vidal Feitosa
 estacoes:
-  - codigo: "2245048"
-    nome: "PREENCHER"
-    lat: -00.0000
-    lon: -00.0000
-    altitude: 0
-    is_referencia: true
-  - codigo: "2245055"
-    nome: "PREENCHER"
-    lat: -00.0000
-    lon: -00.0000
-    altitude: 0
-    is_referencia: false
-  - codigo: "2345067"
-    nome: "PREENCHER"
-    lat: -00.0000
-    lon: -00.0000
-    altitude: 0
-    is_referencia: false
-
+- codigo: '2245048'
+  nome: —
+  lat: 0.0
+  lon: 0.0
+  altitude: 0
+  is_referencia: true
+- codigo: '2245055'
+  nome: —
+  lat: 0.0
+  lon: 0.0
+  altitude: 0
+  is_referencia: false
+- codigo: '2345065'
+  nome: —
+  lat: 0.0
+  lon: 0.0
+  altitude: 0
+  is_referencia: false
 processamento:
-  # Mês/ano com percentual de falhas acima deste limite é marcado como inválido
   max_falhas_pct: 5.0
-  # Número de bins para os histogramas
   histograma_bins: 30
-  # Fração do período comum reservada para holdout (validação dos métodos de preenchimento)
-  holdout_pct_validacao: 0.10
-  # Seed fixo para reprodutibilidade
+  holdout_pct_validacao: 0.1
   random_state: 42
-  # Expoente da distância no IDW
   idw_expoente: 2
-  # Tamanho do batch para inserção no Supabase
   supabase_batch_size: 500
