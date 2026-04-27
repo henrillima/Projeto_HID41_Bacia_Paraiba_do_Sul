@@ -1,0 +1,44 @@
+projeto:
+  nome: "Análise Pluviométrica — Bacia do Paraíba do Sul"
+  bacia: "Paraíba do Sul (cabeceira – URGHI 2, SP)"
+  disciplina: "HID-41: Hidrologia e Drenagem"
+  instituicao: "ITA – Instituto Tecnológico de Aeronáutica"
+  grupo:
+    - "Henri Leonardo dos Santos Lima"
+    - "Pedro Feitosa Gutemberg"
+    - "Gustavo Vidal Feitosa"
+
+# Preenchidos após rodar discover.py e escolher as 3 melhores estações
+estacoes:
+  - codigo: "PREENCHER"       # código de 8 dígitos da ANA (ex.: 02244006)
+    nome: "Nome da estação"
+    lat: -22.0                # latitude decimal (negativo = sul)
+    lon: -45.0                # longitude decimal (negativo = oeste)
+    altitude: 600             # metros
+    is_referencia: true       # true apenas para UMA estação (a com mais dados)
+  - codigo: "PREENCHER"
+    nome: "Nome da estação"
+    lat: -22.0
+    lon: -45.0
+    altitude: 700
+    is_referencia: false
+  - codigo: "PREENCHER"
+    nome: "Nome da estação"
+    lat: -22.0
+    lon: -45.0
+    altitude: 650
+    is_referencia: false
+
+processamento:
+  # Mês/ano com percentual de falhas acima deste limite é marcado como inválido
+  max_falhas_pct: 5.0
+  # Número de bins para os histogramas
+  histograma_bins: 30
+  # Fração do período comum reservada para holdout (validação dos métodos de preenchimento)
+  holdout_pct_validacao: 0.10
+  # Seed fixo para reprodutibilidade
+  random_state: 42
+  # Expoente da distância no IDW
+  idw_expoente: 2
+  # Tamanho do batch para inserção no Supabase
+  supabase_batch_size: 500

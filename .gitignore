@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# Data (nunca commitar os ZIPs brutos nem caches)
+pipeline/data/raw/
+pipeline/data/processed/
+pipeline/*.parquet
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Projeto de referência (não faz parte do repo HID-41)
+Projeto Exemplo/
