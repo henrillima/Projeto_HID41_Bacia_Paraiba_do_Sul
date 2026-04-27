@@ -276,7 +276,7 @@ export default function SelecaoPage() {
                       <div className="col-span-2">
                         <label className="text-xs text-slate-500">Nome da estação</label>
                         <input
-                          type="text" placeholder="Nome (ver HidroWeb)"
+                          type="text" placeholder="Nome da estação"
                           value={est.nome}
                           onChange={(e) => updateField(est.codigo, "nome", e.target.value)}
                           className="mt-0.5 w-full rounded border px-2 py-1 text-sm"
@@ -326,16 +326,7 @@ export default function SelecaoPage() {
                     {prontas.length}/{selecionadas.length} estações prontas para processar
                   </p>
                   <p className="mt-1">
-                    Coordenadas: consulte{" "}
-                    <a
-                      href="https://hidroweb.ana.gov.br"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-blue-500 underline"
-                    >
-                      hidroweb.ana.gov.br
-                    </a>{" "}
-                    pelo código da estação.
+                    Coordenadas disponíveis na ficha da estação no portal da ANA.
                   </p>
                 </div>
                 <button
