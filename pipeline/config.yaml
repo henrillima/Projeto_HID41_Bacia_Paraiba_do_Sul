@@ -8,25 +8,27 @@ projeto:
     - "Pedro Feitosa Gutemberg"
     - "Gustavo Vidal Feitosa"
 
-# Preenchidos após rodar discover.py e escolher as 3 melhores estações
+# Preencha com as estações escolhidas pelo discover.py
+# Dica: lat/lon disponíveis em hidroweb.ana.gov.br buscando pelo código
+# is_referencia: true em APENAS UMA (a com mais anos bons)
 estacoes:
-  - codigo: "PREENCHER"       # código de 8 dígitos da ANA (ex.: 02244006)
-    nome: "Nome da estação"
-    lat: -22.0                # latitude decimal (negativo = sul)
-    lon: -45.0                # longitude decimal (negativo = oeste)
-    altitude: 600             # metros
-    is_referencia: true       # true apenas para UMA estação (a com mais dados)
-  - codigo: "PREENCHER"
-    nome: "Nome da estação"
-    lat: -22.0
-    lon: -45.0
-    altitude: 700
+  - codigo: "2245048"
+    nome: "PREENCHER"
+    lat: -00.0000
+    lon: -00.0000
+    altitude: 0
+    is_referencia: true
+  - codigo: "2245055"
+    nome: "PREENCHER"
+    lat: -00.0000
+    lon: -00.0000
+    altitude: 0
     is_referencia: false
-  - codigo: "PREENCHER"
-    nome: "Nome da estação"
-    lat: -22.0
-    lon: -45.0
-    altitude: 650
+  - codigo: "2345067"
+    nome: "PREENCHER"
+    lat: -00.0000
+    lon: -00.0000
+    altitude: 0
     is_referencia: false
 
 processamento:

@@ -58,12 +58,10 @@ RAW_DATA_DIR = Path(__file__).parent / "data" / "raw"
 CONFIG_FILE  = Path(__file__).parent / "config.yaml"
 
 
-def load_processing_params() -> dict:
-    """Lê apenas os parâmetros de processamento do config.yaml (não as estações)."""
+def load_config_yaml() -> dict:
     if CONFIG_FILE.exists():
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            cfg = yaml.safe_load(f)
-        return cfg.get("processamento", {})
+            return yaml.safe_load(f)
     return {}
 
 
@@ -90,8 +88,8 @@ def main() -> None:
 
     client = get_client(url, key)
 
-    # Parâmetros de processamento (do config.yaml)
-    proc = load_processing_params()
+    cfg_yaml = load_config_yaml()
+    proc      = cfg_yaml.get("processamento", {})
     max_falhas   = proc.get("max_falhas_pct", 5.0)
     n_bins       = proc.get("histograma_bins", 30)
     holdout_pct  = proc.get("holdout_pct_validacao", 0.10)
@@ -99,14 +97,25 @@ def main() -> None:
     idw_exp      = proc.get("idw_expoente", 2)
     batch_size   = proc.get("supabase_batch_size", 500)
 
-    # Lê seleção de estações do Supabase (somente com lat/lon preenchidos)
-    rows = client.table("config_estacoes").select("*").execute().data
-    estacoes_cfg = [r for r in rows if r.get("lat") and r.get("lon")]
+    # Fonte das estações: config_estacoes no Supabase (se populado via UI)
+    # Fallback: config.yaml local
+    rows_db = client.table("config_estacoes").select("*").execute().data
+    estacoes_cfg = [r for r in rows_db if r.get("lat") and r.get("lon")]
+
+    if not estacoes_cfg:
+        logger.info("config_estacoes vazio — lendo estações do config.yaml")
+        yaml_ests = cfg_yaml.get("estacoes", [])
+        estacoes_cfg = [
+            e for e in yaml_ests
+            if str(e.get("codigo", "")).upper() != "PREENCHER"
+            and e.get("lat") and e.get("lon")
+        ]
 
     if len(estacoes_cfg) < 2:
         logger.error(
-            f"Apenas {len(estacoes_cfg)} estação(ões) configurada(s) com coordenadas. "
-            "Configure ao menos 2 no painel /selecao do dashboard."
+            "Nenhuma estação configurada. Faça uma das opções:\n"
+            "  1. Preencha 'estacoes' no config.yaml com código, nome, lat, lon\n"
+            "  2. Use o painel /selecao do dashboard e salve a seleção"
         )
         sys.exit(1)
 
