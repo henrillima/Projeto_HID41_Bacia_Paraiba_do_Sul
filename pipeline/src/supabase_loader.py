@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 from typing import Any
 
 import numpy as np
@@ -47,10 +48,19 @@ def _batch_insert(
     total = 0
     for i in range(0, len(records), batch_size):
         chunk = [_sanitize_record(r) for r in records[i : i + batch_size]]
-        if upsert:
-            client.table(table).upsert(chunk).execute()
-        else:
-            client.table(table).insert(chunk).execute()
+        for tentativa in range(4):
+            try:
+                if upsert:
+                    client.table(table).upsert(chunk).execute()
+                else:
+                    client.table(table).insert(chunk).execute()
+                break
+            except Exception as exc:
+                if tentativa == 3:
+                    raise
+                wait = 2 ** tentativa
+                logger.warning(f"  [{table}] batch {i // batch_size + 1} falhou ({exc}); retry em {wait}s")
+                time.sleep(wait)
         total += len(chunk)
         logger.debug(f"  [{table}] inserido batch {i // batch_size + 1} ({len(chunk)} registros)")
     return total
