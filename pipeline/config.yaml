@@ -9,22 +9,22 @@ projeto:
   - Gustavo Vidal Feitosa
 estacoes:
 - codigo: '2245048'
-  nome: —
-  lat: 0.0
-  lon: 0.0
-  altitude: 0
+  nome: PINDAMONHANGABA
+  lat: -22.9111
+  lon: -45.4694
+  altitude: 524
   is_referencia: true
 - codigo: '2245055'
-  nome: —
-  lat: 0.0
-  lon: 0.0
-  altitude: 0
+  nome: ESTRADA DO CUNHA
+  lat: -22.9961
+  lon: -45.0433
+  altitude: 790
   is_referencia: false
 - codigo: '2345065'
-  nome: —
-  lat: 0.0
-  lon: 0.0
-  altitude: 0
+  nome: SÃO LUÍS DO PARAITINGA
+  lat: -23.2392
+  lon: -45.3056
+  altitude: 760
   is_referencia: false
 processamento:
   max_falhas_pct: 5.0

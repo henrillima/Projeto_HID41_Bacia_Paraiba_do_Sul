@@ -108,7 +108,7 @@ def main() -> None:
         estacoes_cfg = [
             e for e in yaml_ests
             if str(e.get("codigo", "")).upper() != "PREENCHER"
-            and e.get("lat") and e.get("lon")
+            and e.get("codigo")
         ]
 
     if len(estacoes_cfg) < 2:
@@ -273,14 +273,18 @@ def main() -> None:
         n_com_dado   = int(df_orig["valor"].notna().sum())
         pct_orig     = round(100.0 * (1 - n_com_dado / n_total), 2) if n_total else 0.0
 
-        n_preench = 0
-        if res.get("reg") and vencedor:
-            n_preench = res["reg"]["n_preenchidos"] if vencedor == "regressao" else res["idw"]["n_preenchidos"]
-        pct_pos = round(100.0 * (1 - (n_com_dado + n_preench) / n_total), 2) if n_total else 0.0
+        # pct pós-preenchimento: NaN restantes na série preenchida, apenas no período original
+        orig_dates = df_orig.set_index("data").index
+        n_nan_pos = int(df_pivot.loc[df_pivot.index.isin(orig_dates), codigo].isna().sum())
+        pct_pos = round(100.0 * n_nan_pos / n_total, 2) if n_total else 0.0
+
+        nome_est = est.get("nome", "") or ""
+        if not nome_est or nome_est.strip() in ("—", "PREENCHER", ""):
+            nome_est = codigo
 
         upsert_estacao(client, {
             "codigo":                      codigo,
-            "nome":                        est.get("nome") or codigo,
+            "nome":                        nome_est,
             "lat":                         float(est["lat"]),
             "lon":                         float(est["lon"]),
             "altitude":                    est.get("altitude"),
