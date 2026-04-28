@@ -8,6 +8,7 @@ import { usePreenchimento } from "@/hooks/usePreenchimento";
 import { useSerieDiaria } from "@/hooks/useSerieDiaria";
 import { ComparacaoMetodos } from "@/components/charts/ComparacaoMetodos";
 import { SeriePreenchimento, PontoPreenchimento } from "@/components/charts/SeriePreenchimento";
+import type { ResumoEstacao } from "@/lib/types";
 
 const ANO_ATUAL = new Date().getFullYear();
 
@@ -21,18 +22,27 @@ export default function PreenchimentoPage() {
 
   // Station tab — default to reference station
   const [stationIdx, setStationIdx] = useState(0);
+
+  // Time range — shared across all stations
+  const [anoInicio, setAnoInicio] = useState(1900);
+  const [anoFim, setAnoFim]       = useState(ANO_ATUAL);
+
+  const resetToFullRange = (est: ResumoEstacao | undefined) => {
+    const ini = Number(est?.data_inicio?.slice(0, 4));
+    setAnoInicio(ini > 1800 ? ini : 1900);
+    setAnoFim(ANO_ATUAL);
+  };
+
   useEffect(() => {
     if (estacoes.length === 0) return;
     const refIdx = estacoes.findIndex((e) => e.is_referencia);
-    if (refIdx >= 0) setStationIdx(refIdx);
+    const idx = refIdx >= 0 ? refIdx : 0;
+    setStationIdx(idx);
+    resetToFullRange(estacoes[idx]);
   }, [estacoes]);
 
   const estacaoAtiva = estacoes[stationIdx];
   const isRef = estacaoAtiva?.is_referencia ?? false;
-
-  // Time range — shared across all stations
-  const [anoInicio, setAnoInicio] = useState(ANO_ATUAL - 9);
-  const [anoFim, setAnoFim]       = useState(ANO_ATUAL);
   const dataInicio = `${anoInicio}-01-01`;
   const dataFim    = `${anoFim}-12-31`;
 
@@ -88,7 +98,7 @@ export default function PreenchimentoPage() {
   const ultimoPreench   = diasPreench[diasPreench.length - 1]?.data?.slice(0, 10) ?? null;
 
   // Interval selector component (shared)
-  const seletorIntervalo = (dataIni: string | undefined) => (
+  const seletorIntervalo = () => (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-slate-50 px-3 py-2 text-sm">
       <span className="text-slate-500">Intervalo:</span>
       <input
@@ -109,7 +119,7 @@ export default function PreenchimentoPage() {
         >{n}a</button>
       ))}
       <button
-        onClick={() => { if (dataIni) { setAnoInicio(Number(dataIni)); setAnoFim(ANO_ATUAL); } }}
+        onClick={() => resetToFullRange(estacaoAtiva)}
         className="rounded border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 hover:bg-blue-50 hover:border-blue-300 transition-colors"
       >Completa</button>
     </div>
@@ -133,7 +143,7 @@ export default function PreenchimentoPage() {
           {estacoes.map((e, i) => (
             <button
               key={e.codigo}
-              onClick={() => setStationIdx(i)}
+              onClick={() => { setStationIdx(i); resetToFullRange(e); }}
               className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all ${
                 stationIdx === i
                   ? "border-blue-500 bg-blue-600 text-white shadow-sm"
@@ -240,7 +250,7 @@ export default function PreenchimentoPage() {
                 <h2 className="text-base font-semibold text-slate-700">
                   Série diária corrigida — {ref.nome ?? ref.codigo}
                 </h2>
-                {seletorIntervalo(ref.data_inicio?.slice(0, 4))}
+                {seletorIntervalo()}
               </div>
 
               <div className="mb-4 flex items-center gap-4 text-xs text-slate-500">
@@ -303,7 +313,7 @@ export default function PreenchimentoPage() {
               <h2 className="text-base font-semibold text-slate-700">
                 Série diária — {estacaoAtiva.nome}
               </h2>
-              {seletorIntervalo(estacaoAtiva.data_inicio?.slice(0, 4))}
+              {seletorIntervalo()}
             </div>
 
             {ldAuxAtiva ? (

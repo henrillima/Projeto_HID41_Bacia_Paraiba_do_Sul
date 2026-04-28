@@ -14,7 +14,7 @@ import { SeriePreenchimento } from "@/components/charts/SeriePreenchimento";
 import { Histograma } from "@/components/charts/Histograma";
 import { TabelaEstatisticas } from "@/components/TabelaEstatisticas";
 
-import type { TipoSerie } from "@/lib/types";
+import type { TipoSerie, ResumoEstacao } from "@/lib/types";
 import { TIPO_SERIE_LABELS, MES_ABREV } from "@/lib/types";
 import { fmtMm, computeHistogram } from "@/lib/utils";
 
@@ -25,20 +25,35 @@ const ANO_ATUAL = new Date().getFullYear();
 export default function SeriesPage() {
   const { data: estacoes, loading: ldE } = useEstacoes();
 
-  // Station selector — default to reference station once loaded
+  // Station selector — pre-select from ?estacao= param, else default to reference
   const [stationIdx, setStationIdx] = useState(0);
-  useEffect(() => {
-    if (estacoes.length === 0) return;
-    const refIdx = estacoes.findIndex((e) => e.is_referencia);
-    if (refIdx >= 0) setStationIdx(refIdx);
-  }, [estacoes]);
 
   // Series type tab
   const [tab, setTab] = useState<TabKey>("diaria");
 
-  // Time range — default last 10 years
-  const [anoInicio, setAnoInicio] = useState(ANO_ATUAL - 9);
+  // Time range — 1900 as placeholder; updated to full series once station is known
+  const [anoInicio, setAnoInicio] = useState(1900);
   const [anoFim, setAnoFim] = useState(ANO_ATUAL);
+
+  const resetToFullRange = (est: ResumoEstacao | undefined) => {
+    const ini = Number(est?.data_inicio?.slice(0, 4));
+    setAnoInicio(ini > 1800 ? ini : 1900);
+    setAnoFim(ANO_ATUAL);
+  };
+
+  useEffect(() => {
+    if (estacoes.length === 0) return;
+    let idx = estacoes.findIndex((e) => e.is_referencia);
+    if (idx < 0) idx = 0;
+    const param = new URLSearchParams(window.location.search).get("estacao");
+    if (param) {
+      const found = estacoes.findIndex((e) => e.codigo === param);
+      if (found >= 0) idx = found;
+    }
+    // Batch both updates: single re-render → single useSerieDiaria fetch
+    setStationIdx(idx);
+    resetToFullRange(estacoes[idx]);
+  }, [estacoes]);
   const dataInicio = `${anoInicio}-01-01`;
   const dataFim = `${anoFim}-12-31`;
 
@@ -104,7 +119,12 @@ export default function SeriesPage() {
     return vals.length > 0 ? computeHistogram(vals, 20) : null;
   }, [valoresPorTab, tab]);
 
-  const loading = ldD || ldM || ldA || ldMx;
+  // Per-tab: only block rendering while the relevant series is loading.
+  // Changing the date range only re-fetches daily data (ldD), so monthly/annual/max
+  // tabs stay visible and show the filtered results immediately.
+  const loadingAtual: boolean = (
+    { diaria: ldD, mensal: ldM, anual: ldA, max_diaria_anual: ldMx } as Record<TabKey, boolean>
+  )[tab];
 
   return (
     <div className="space-y-6">
@@ -124,7 +144,7 @@ export default function SeriesPage() {
           {estacoes.map((e, i) => (
             <button
               key={e.codigo}
-              onClick={() => setStationIdx(i)}
+              onClick={() => { setStationIdx(i); resetToFullRange(e); }}
               className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all ${
                 stationIdx === i
                   ? "border-blue-500 bg-blue-600 text-white shadow-sm"
@@ -231,7 +251,7 @@ export default function SeriesPage() {
             ))}
           </div>
 
-          {loading ? (
+          {loadingAtual ? (
             <div className="space-y-4">
               <div className="h-64 animate-pulse rounded-xl bg-slate-100" />
               <div className="h-48 animate-pulse rounded-xl bg-slate-100" />
@@ -270,7 +290,7 @@ export default function SeriesPage() {
                     Histograma — {TIPO_SERIE_LABELS[tab]}
                     <span className="ml-2 text-xs font-normal text-slate-400">intervalo selecionado</span>
                   </h2>
-                  {loading ? (
+                  {loadingAtual ? (
                     <div className="h-48 animate-pulse rounded bg-slate-100" />
                   ) : histDataDynamic ? (
                     <Histograma dados={histDataDynamic} />
@@ -283,7 +303,7 @@ export default function SeriesPage() {
                     Estatísticas descritivas
                     <span className="ml-2 text-xs font-normal text-slate-400">intervalo selecionado</span>
                   </h2>
-                  {loading ? (
+                  {loadingAtual ? (
                     <div className="h-48 animate-pulse rounded bg-slate-100" />
                   ) : histDataDynamic?.estatisticas ? (
                     <TabelaEstatisticas est={histDataDynamic.estatisticas} />

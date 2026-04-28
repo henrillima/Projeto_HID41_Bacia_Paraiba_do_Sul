@@ -11,7 +11,7 @@ interface EstacaoCardProps {
 export function EstacaoCard({ estacao: e }: EstacaoCardProps) {
   return (
     <Link
-      href={`/series/${e.codigo}`}
+      href={`/series?estacao=${e.codigo}`}
       className={cn(
         "group block rounded-xl border bg-white p-5 shadow-sm transition",
         "hover:border-blue-500 hover:shadow-md",

@@ -92,7 +92,7 @@ export default function EstacoesPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link
-                      href="/series"
+                      href={`/series?estacao=${e.codigo}`}
                       className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
                     >
                       Ver séries
