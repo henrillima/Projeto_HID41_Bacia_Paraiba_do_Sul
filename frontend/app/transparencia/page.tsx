@@ -28,6 +28,44 @@ function Formula({ children }: { children: string }) {
   );
 }
 
+interface DefBoxProps {
+  termo: string;
+  sigla?: string;
+  formula?: string;
+  cor?: "blue" | "violet" | "emerald" | "amber" | "slate";
+  children: React.ReactNode;
+}
+
+const COR_MAP = {
+  blue:    { card: "border-blue-200 bg-blue-50",     titulo: "text-blue-800",   sigla: "bg-blue-200 text-blue-700"   },
+  violet:  { card: "border-violet-200 bg-violet-50", titulo: "text-violet-800", sigla: "bg-violet-200 text-violet-700" },
+  emerald: { card: "border-emerald-200 bg-emerald-50",titulo: "text-emerald-800",sigla: "bg-emerald-200 text-emerald-700"},
+  amber:   { card: "border-amber-200 bg-amber-50",   titulo: "text-amber-800",  sigla: "bg-amber-200 text-amber-700"  },
+  slate:   { card: "border-slate-200 bg-slate-50",   titulo: "text-slate-800",  sigla: "bg-slate-200 text-slate-600"  },
+};
+
+function DefBox({ termo, sigla, formula, cor = "slate", children }: DefBoxProps) {
+  const c = COR_MAP[cor];
+  return (
+    <div className={`rounded-xl border p-4 ${c.card}`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <p className={`font-bold text-sm ${c.titulo}`}>{termo}</p>
+        {sigla && (
+          <span className={`rounded px-1.5 py-0.5 text-xs font-mono font-semibold ${c.sigla}`}>
+            {sigla}
+          </span>
+        )}
+      </div>
+      {formula && (
+        <div className="mt-2 rounded-lg bg-white/70 px-3 py-2 font-mono text-xs text-slate-700">
+          {formula}
+        </div>
+      )}
+      <p className="mt-2 text-xs text-slate-600 leading-relaxed">{children}</p>
+    </div>
+  );
+}
+
 export default function TransparenciaPage() {
   const { data: estacoes, loading: ldE } = useEstacoes();
   const { data: semDados, loading: ldSD } = useEstacoesSemDados();
@@ -41,10 +79,10 @@ export default function TransparenciaPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Transparência Metodológica</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Metodologia</h1>
         <p className="mt-1 text-slate-500">
-          Documentação completa de cada etapa do processamento — da coleta dos dados brutos
-          até as séries finais publicadas no dashboard.
+          Documentação de cada etapa do processamento — da coleta dos dados brutos
+          até as séries finais — com glossário dos principais termos técnicos.
         </p>
       </div>
 
@@ -231,7 +269,7 @@ export default function TransparenciaPage() {
         )}
       </Secao>
 
-      {/* 5. Comparação dos métodos (estação de referência) */}
+      {/* 5. Comparação dos métodos */}
       <Secao numero="5" titulo="Comparação dos métodos — estação de referência">
         {!ref ? (
           <p className="text-sm text-slate-400">Aguardando execução do pipeline.</p>
@@ -302,6 +340,233 @@ export default function TransparenciaPage() {
           </div>
         </Secao>
       )}
+
+      {/* Glossário */}
+      <section className="rounded-xl border bg-white p-5 shadow-sm">
+        <h2 className="mb-1 flex items-center gap-2 text-base font-semibold text-slate-800">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#00205B] text-xs font-bold text-white">
+            G
+          </span>
+          Glossário de termos técnicos
+        </h2>
+        <p className="mb-5 text-xs text-slate-400">
+          Definições dos conceitos utilizados ao longo do pipeline e do dashboard.
+        </p>
+
+        <div className="mb-4">
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">Métricas estatísticas</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <DefBox
+              termo="Erro Quadrático Médio"
+              sigla="RMSE"
+              formula="RMSE = √[ (1/N) · Σ (P̂ᵢ − Pᵢ)² ]"
+              cor="blue"
+            >
+              Mede o desvio médio entre os valores estimados (P̂) e os observados (P), em mm.
+              É a principal métrica de comparação entre os métodos de preenchimento —
+              quanto menor o RMSE, mais próximas são as estimativas dos valores reais.
+              Penaliza erros grandes de forma desproporcional (elevados ao quadrado).
+            </DefBox>
+
+            <DefBox
+              termo="Coeficiente de Determinação"
+              sigla="R²"
+              formula="R² = 1 − SS_res / SS_tot"
+              cor="blue"
+            >
+              Indica a fração da variância da variável resposta explicada pelo modelo de
+              regressão. Varia de 0 a 1: R² = 1 significa ajuste perfeito; R² = 0 significa
+              que o modelo não explica nada além da média.{" "}
+              <strong>Não se aplica ao IDW</strong>, pois este não é um modelo paramétrico —
+              não ajusta coeficientes e não "explica" variância.
+            </DefBox>
+
+            <DefBox
+              termo="Coeficiente de Variação"
+              sigla="CV"
+              formula="CV = σ / μ"
+              cor="blue"
+            >
+              Razão entre o desvio padrão (σ) e a média (μ), adimensional.
+              Mede a dispersão relativa da série. Um CV alto indica alta variabilidade
+              em relação à média — esperado em séries de precipitação diária, onde
+              há grande contraste entre dias secos e eventos intensos.
+            </DefBox>
+
+            <DefBox
+              termo="Assimetria"
+              sigla="g₁"
+              formula="g₁ = [n/((n−1)(n−2))] · Σ[(xᵢ−μ)/σ]³"
+              cor="violet"
+            >
+              Mede o grau de simetria da distribuição. g₁ {'>'} 0 indica cauda longa
+              para a direita (valores extremos altos) — típico de precipitação diária,
+              onde a maioria dos dias tem pouca ou nenhuma chuva e poucos dias concentram
+              volumes elevados.
+            </DefBox>
+
+            <DefBox
+              termo="Curtose em excesso"
+              sigla="g₂"
+              formula="g₂ = curtose − 3"
+              cor="violet"
+            >
+              Mede o "peso das caudas" da distribuição em relação à normal (g₂ = 0).
+              g₂ {'>'} 0 (leptocúrtica): caudas pesadas, pico agudo — eventos extremos mais
+              frequentes do que a normal prevê. g₂ {'<'} 0 (platicúrtica): caudas leves.
+              Séries de precipitação geralmente apresentam g₂ positivo.
+            </DefBox>
+
+            <DefBox
+              termo="Percentis (P25, P75, P90…)"
+              cor="violet"
+            >
+              O percentil Pₓ é o valor abaixo do qual estão x% das observações.
+              P25 e P75 delimitam o intervalo interquartil (50% central dos dados).
+              P90 e P95 caracterizam eventos mais raros; P99 equivale ao limiar do 1%
+              mais extremo — útil para identificar eventos de precipitação intensa.
+            </DefBox>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">Métodos de preenchimento</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <DefBox
+              termo="Holdout (validação)"
+              cor="emerald"
+            >
+              Subconjunto dos dados reservado exclusivamente para testar o modelo —
+              nunca usado durante o treinamento. Aqui corresponde a 10% do{" "}
+              <em>período comum</em>, sorteados aleatoriamente com semente 42
+              (reproduzível). Usar o mesmo holdout para ambos os métodos garante que
+              a comparação pelo RMSE seja justa.
+            </DefBox>
+
+            <DefBox
+              termo="Período comum"
+              cor="emerald"
+            >
+              Conjunto de dias em que <strong>todas</strong> as estações (referência +
+              auxiliares) possuem dado registrado simultaneamente. É a base de dados
+              usada para treinar a regressão e calibrar o IDW. Quanto mais longo o
+              período comum, mais representativo e confiável é o treinamento.
+            </DefBox>
+
+            <DefBox
+              termo="OLS — Mínimos Quadrados Ordinários"
+              sigla="OLS"
+              formula="β̂ = (XᵀX)⁻¹ Xᵀ y"
+              cor="emerald"
+            >
+              Método de ajuste da regressão linear que minimiza a soma dos quadrados
+              dos resíduos. Produz os coeficientes β que tornam as estimativas
+              P̂_ref mais próximas possíveis de P_ref no conjunto de treino.
+              É o estimador não-viesado de mínima variância (teorema de Gauss-Markov).
+            </DefBox>
+
+            <DefBox
+              termo="IDW — Ponderação pelo Inverso da Distância"
+              sigla="IDW"
+              formula="P_ref(t) = Σ[Pᵢ/dᵢᵖ] / Σ[1/dᵢᵖ]"
+              cor="emerald"
+            >
+              Método de interpolação espacial que estima um valor em um ponto
+              ponderando as observações vizinhas pelo inverso de sua distância
+              elevada ao expoente p (aqui p = 2). Estações mais próximas recebem
+              peso proporcionalmente maior. Não exige período comum completo:
+              funciona com qualquer auxiliar disponível no dia.
+            </DefBox>
+
+            <DefBox
+              termo="Expoente IDW (p = 2)"
+              cor="emerald"
+            >
+              Controla a velocidade de decaimento do peso com a distância.
+              Com p = 2, dobrar a distância reduz o peso a ¼. Valores maiores
+              concentram a influência nas estações mais próximas; valores menores
+              tornam os pesos mais uniformes independentemente da distância.
+              p = 2 é o valor clássico na literatura para interpolação de precipitação.
+            </DefBox>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">Conceitos geográficos e de dados</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <DefBox
+              termo="Distância haversine"
+              formula="d = 2R · arcsin(√[sin²(Δlat/2) + cos(lat₁)·cos(lat₂)·sin²(Δlon/2)])"
+              cor="amber"
+            >
+              Distância geodésica entre dois pontos na superfície da Terra calculada
+              a partir de suas coordenadas (lat/lon). Considera a curvatura terrestre,
+              ao contrário da distância euclidiana plana. Para as distâncias do projeto
+              (~40–45 km), a diferença em relação à distância plana é inferior a 0,1%.
+              R = 6.371 km (raio médio da Terra).
+            </DefBox>
+
+            <DefBox
+              termo="Nível de consistência"
+              cor="amber"
+            >
+              Grau de revisão dos dados pela ANA.{" "}
+              <strong>Nível 1 (bruto):</strong> dados coletados diretamente do
+              pluviômetro, sem revisão — podem conter erros de transcrição.{" "}
+              <strong>Nível 2 (consistido):</strong> dados revisados, com correção de
+              erros grosseiros e marcação explícita de ausências. Quando ambos estão
+              disponíveis para o mesmo mês, o nível 2 tem prioridade.
+            </DefBox>
+
+            <DefBox
+              termo="NaN / Falha"
+              sigla="NaN"
+              cor="amber"
+            >
+              <em>Not a Number</em> — representação computacional de um valor ausente
+              ou inválido. Na série diária, um dia com NaN indica que não há registro
+              de precipitação para aquela data (pluviômetro inoperante, dado descartado
+              na consistência ou estação ainda não instalada). Falhas afetam a validade
+              mensal e anual conforme o limiar de 5%.
+            </DefBox>
+
+            <DefBox
+              termo="LTTB — Downsampling"
+              sigla="LTTB"
+              cor="slate"
+            >
+              <em>Largest Triangle Three Buckets</em> — algoritmo que reduz uma série
+              de N pontos a M pontos preservando o formato visual. Para cada segmento,
+              seleciona o ponto que maximiza a área do triângulo com os pontos adjacentes
+              já escolhidos. Usado nos gráficos da série diária (~34.000 pontos por
+              estação) para manter a performance do navegador sem distorcer a aparência
+              da série.
+            </DefBox>
+
+            <DefBox
+              termo="Upsert"
+              cor="slate"
+            >
+              Operação de banco de dados que combina INSERT e UPDATE:{" "}
+              insere o registro se não existir; atualiza se já existir (baseado
+              em uma chave única). Todas as cargas do pipeline usam upsert,
+              tornando a re-execução idempotente — rodar o pipeline duas vezes
+              produz o mesmo resultado sem duplicar dados.
+            </DefBox>
+
+            <DefBox
+              termo="Série idempotente"
+              cor="slate"
+            >
+              Propriedade de uma operação que pode ser aplicada múltiplas vezes
+              sem alterar o resultado além da primeira aplicação. O pipeline limpa
+              os dados anteriores antes de cada carga (DELETE CASCADE seguido de
+              upsert), garantindo que re-execuções corrijam dados sem acumular
+              registros duplicados ou inconsistentes.
+            </DefBox>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

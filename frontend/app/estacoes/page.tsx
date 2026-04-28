@@ -28,7 +28,7 @@ export default function EstacoesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Estações pluviométricas</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Estações pluviométricas escolhidas</h1>
         <p className="mt-1 text-sm text-slate-500">
           Clique em uma estação para ver as séries históricas e histogramas.
         </p>
@@ -92,7 +92,7 @@ export default function EstacoesPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link
-                      href={`/series/${e.codigo}`}
+                      href="/series"
                       className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
                     >
                       Ver séries

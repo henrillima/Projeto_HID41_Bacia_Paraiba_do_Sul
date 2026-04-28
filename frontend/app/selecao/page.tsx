@@ -145,6 +145,82 @@ export default function SelecaoPage() {
         </p>
       </div>
 
+      {/* Aviso para a professora */}
+      <div className="rounded-xl border border-amber-300 bg-amber-50 p-5">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 text-xl">⚠️</span>
+          <div className="space-y-2 text-sm">
+            <p className="font-bold text-amber-900">
+              Nota para a professora — funcionalidade restrita na versão em produção
+            </p>
+            <p className="text-amber-800">
+              Esta aba de seleção de estações <strong>ainda não está integrada na versão de deploy</strong>{" "}
+              (acessível publicamente via Vercel). No estado atual, ela funciona apenas na versão local,
+              pois parte do processo requer execução manual de scripts Python no terminal e inserção
+              direta de coordenadas geográficas — informações que não constam nos arquivos ZIP
+              disponibilizados pela ANA HidroWeb e que precisam ser obtidas separadamente no portal.
+            </p>
+            <p className="text-amber-800">
+              Para viabilizar a automação completa desta etapa, entrei em contato com a ANA solicitando
+              acesso à <strong>API do HidroWeb</strong>. Quando esse acesso for concedido, será possível
+              buscar automaticamente os dados de qualquer estação — incluindo coordenadas e série histórica
+              — diretamente desta interface, sem necessidade de intervenção manual ou execução local.
+              A integração desta aba com a API já está planejada na arquitetura do sistema.
+            </p>
+            <details className="mt-1">
+              <summary className="cursor-pointer text-xs font-semibold text-amber-700 hover:underline">
+                Ver e-mail enviado à ANA (clique para expandir)
+              </summary>
+              <div className="mt-3 rounded-lg border border-amber-200 bg-white px-4 py-3 text-xs text-slate-700 leading-relaxed">
+                <p className="mb-2 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">E-mail enviado à ANA HidroWeb</p>
+                <p><strong>Prezados,</strong></p>
+                <br />
+                <p>
+                  Sou aluno de graduação em Engenharia Civil-Aeronáutica no Instituto Tecnológico de
+                  Aeronáutica (ITA), em São José dos Campos/SP, e estou cursando a disciplina de
+                  Hidrologia e Drenagem (HID-41).
+                </p>
+                <br />
+                <p>
+                  Como parte das atividades da disciplina, estou desenvolvendo um projeto de estudo
+                  hidrológico da bacia hidrográfica do Paraíba do Sul (cabeceira), que envolve a análise
+                  de séries históricas de precipitação de estações pluviométricas localizadas na bacia.
+                  O trabalho contempla a organização das séries de precipitação total diária, mensal e
+                  anual, a constituição da série de precipitação máxima diária anual, o preenchimento de
+                  falhas por meio de regressão múltipla e ponderação pelo inverso da distância (IDW),
+                  além da análise estatística e geração de histogramas de frequência.
+                </p>
+                <br />
+                <p>
+                  Para automatizar a aquisição e o processamento dos dados das estações pluviométricas
+                  selecionadas, gostaria de solicitar acesso à API do HidroWeb. O uso da API permitirá
+                  maior reprodutibilidade e rastreabilidade no processo de coleta dos dados, além de
+                  viabilizar a integração direta com as rotinas de análise desenvolvidas em Python.
+                </p>
+                <br />
+                <p>Seguem as informações solicitadas para o cadastro:</p>
+                <ul className="mt-1 ml-4 list-disc space-y-0.5">
+                  <li><strong>Nome:</strong> Henri Leonardo dos Santos Lima</li>
+                  <li><strong>CPF:</strong> XXX.XXX.XXX-XX (Dado Censurado por Segurança)</li>
+                  <li><strong>E-mail:</strong> henri.lima.8917@ga.ita.br</li>
+                </ul>
+                <br />
+                <p>
+                  Agradeço desde já a atenção e fico à disposição para fornecer quaisquer informações
+                  adicionais que se façam necessárias.
+                </p>
+                <br />
+                <p>
+                  Atenciosamente,<br />
+                  <strong>Henri Leonardo dos Santos Lima</strong><br />
+                  Aluno de Engenharia Civil-Aeronáutica — ITA
+                </p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+
       {/* Filtros */}
       <div className="flex flex-wrap gap-4 rounded-xl border bg-white p-4 shadow-sm">
         <div className="flex items-center gap-2 text-sm">

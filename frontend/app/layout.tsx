@@ -49,10 +49,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <a href="/" className="hover:text-white">Início</a>
               <a href="/dashboard" className="hover:text-white">Dashboard</a>
               <a href="/estacoes" className="hover:text-white">Estações</a>
+              <a href="/series" className="hover:text-white">Séries</a>
               <a href="/selecao" className="hover:text-white">Seleção</a>
               <a href="/preenchimento" className="hover:text-white">Preenchimento</a>
               <a href="/tabela" className="hover:text-white">Tabela</a>
-              <a href="/transparencia" className="hover:text-white">Transparência</a>
+              <a href="/transparencia" className="hover:text-white">Metodologia</a>
             </nav>
           </div>
         </header>

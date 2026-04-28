@@ -45,8 +45,8 @@ const PAGINAS = [
   },
   {
     href: "/transparencia",
-    titulo: "Transparência",
-    descricao: "Documentação completa de cada etapa: coleta, construção das séries e resultados do preenchimento.",
+    titulo: "Metodologia",
+    descricao: "Documentação completa de cada etapa, com glossário dos termos técnicos e resultados do preenchimento.",
     cor: "border-amber-200 bg-amber-50",
     corTexto: "text-amber-700",
   },
