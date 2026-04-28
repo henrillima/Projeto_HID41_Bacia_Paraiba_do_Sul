@@ -37,6 +37,13 @@ const PAGINAS = [
     corTexto: "text-emerald-700",
   },
   {
+    href: "/tabela",
+    titulo: "Tabela de Séries",
+    descricao: "Série temporal completa por estação com dados originais e corrigidos por cada método, com exportação XLSX.",
+    cor: "border-teal-200 bg-teal-50",
+    corTexto: "text-teal-700",
+  },
+  {
     href: "/transparencia",
     titulo: "Transparência",
     descricao: "Documentação completa de cada etapa: coleta, construção das séries e resultados do preenchimento.",

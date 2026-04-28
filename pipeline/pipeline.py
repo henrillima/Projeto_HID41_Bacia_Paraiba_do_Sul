@@ -40,6 +40,7 @@ from src.supabase_loader import (
     insert_histograma,
     insert_max_diaria_anual,
     insert_preenchimento,
+    insert_preenchimento_diario,
     insert_serie_anual,
     insert_serie_diaria,
     insert_serie_mensal,
@@ -314,6 +315,20 @@ def main() -> None:
         insert_serie_mensal(client, codigo, series_mensais[codigo], batch_size)
         insert_serie_anual(client, codigo, series_anuais[codigo], batch_size)
         insert_max_diaria_anual(client, codigo, series_max[codigo], batch_size)
+
+        # Store per-method daily values for failure days (used by /tabela page)
+        if res.get("reg"):
+            res_reg_l = res["reg"]
+            res_idw_l = res.get("idw")
+            mascara_reg = res_reg_l["mascara_preenchidos"]
+            mascara_idw = res_idw_l["mascara_preenchidos"] if res_idw_l else pd.Series(False, index=df_pivot.index)
+            mascara_total = mascara_reg | mascara_idw
+            insert_preenchimento_diario(
+                client, codigo, mascara_total,
+                serie_reg=res_reg_l["serie_preenchida"],
+                serie_idw=res_idw_l["serie_preenchida"] if res_idw_l else None,
+                batch_size=batch_size,
+            )
 
         for tipo, dados in histogramas[codigo].items():
             insert_histograma(client, codigo, tipo, dados)

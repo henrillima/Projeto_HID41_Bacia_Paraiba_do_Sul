@@ -51,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <a href="/estacoes" className="hover:text-white">Estações</a>
               <a href="/selecao" className="hover:text-white">Seleção</a>
               <a href="/preenchimento" className="hover:text-white">Preenchimento</a>
+              <a href="/tabela" className="hover:text-white">Tabela</a>
               <a href="/transparencia" className="hover:text-white">Transparência</a>
             </nav>
           </div>

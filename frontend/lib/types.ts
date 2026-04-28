@@ -133,6 +133,13 @@ export interface ConfigEstacao {
   selecionado_em?: string;
 }
 
+export interface PreenchimentoDiario {
+  estacao_codigo: string;
+  data: string;
+  valor_regressao: number | null;
+  valor_idw: number | null;
+}
+
 export interface EstacaoSemDados {
   codigo: string;
   nome_arquivo: string;

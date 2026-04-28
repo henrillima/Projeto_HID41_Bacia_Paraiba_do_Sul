@@ -197,6 +197,40 @@ def insert_estacoes_sem_dados(client: Client, registros: list[dict]) -> int:
     return len(sanitized)
 
 
+def insert_preenchimento_diario(
+    client: Client,
+    codigo: str,
+    mascara: "pd.Series",
+    serie_reg: "pd.Series",
+    serie_idw: "pd.Series | None",
+    batch_size: int = 500,
+) -> int:
+    """
+    Insere valores diários por método para os dias de falha.
+    mascara: Series booleana; True nos dias que algum método preencheu.
+    serie_reg / serie_idw: séries completas; apenas dias da máscara são inseridos.
+    """
+    dias = mascara[mascara].index
+    if len(dias) == 0:
+        return 0
+
+    records = []
+    for data in dias:
+        data_str = data.isoformat() if hasattr(data, "isoformat") else str(data)[:10]
+        v_reg = serie_reg.loc[data] if data in serie_reg.index else None
+        v_idw = serie_idw.loc[data] if (serie_idw is not None and data in serie_idw.index) else None
+        records.append({
+            "estacao_codigo":  codigo,
+            "data":            data_str,
+            "valor_regressao": _nan_to_none(float(v_reg)) if v_reg is not None and pd.notna(v_reg) else None,
+            "valor_idw":       _nan_to_none(float(v_idw)) if v_idw is not None and pd.notna(v_idw) else None,
+        })
+
+    n = _batch_insert(client, "preenchimento_diario", records, batch_size, upsert=True)
+    logger.info(f"[preenchimento_diario] {codigo}: {n} dias inseridos")
+    return n
+
+
 def insert_preenchimento(
     client: Client,
     estacao_ref: str,
