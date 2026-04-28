@@ -55,22 +55,32 @@ export default function TabelaPage() {
   const temIdw = preench.some((p) => p.valor_idw != null);
 
   // XLSX export
+  // Para dias observados: as 3 colunas recebem o valor observado.
+  // Para dias de falha: Original fica vazio; Reg/IDW vêm de preenchimento_diario
+  //   com fallback para o valor final (precipitacao_diaria.valor) se a tabela
+  //   de comparação ainda não foi populada (pipeline não re-executado).
   const handleExport = useCallback(async () => {
     const { utils, writeFile } = await import("xlsx");
-    const wsData = [
+    const wsData: (string | number)[][] = [
       ["Data", "Original (mm)", "Regressão (mm)", "IDW (mm)"],
-      ...rows.map((r) => [
-        r.date,
-        r.original ?? "",
-        r.regressao ?? "",
-        r.idw ?? "",
-      ]),
     ];
+    for (const d of diaria) {
+      const date = d.data.slice(0, 10);
+      if (d.preenchido) {
+        const p = preenchMap.get(date);
+        const reg = p?.reg ?? d.valor ?? "";
+        const idw = p?.idw ?? d.valor ?? "";
+        wsData.push([date, "", reg, idw]);
+      } else {
+        const v = d.valor ?? "";
+        wsData.push([date, v, v, v]);
+      }
+    }
     const ws = utils.aoa_to_sheet(wsData);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, estacaoSel?.nome ?? codigo);
     writeFile(wb, `serie_${codigo}.xlsx`);
-  }, [rows, codigo, estacaoSel]);
+  }, [diaria, preenchMap, codigo, estacaoSel]);
 
   return (
     <div className="space-y-6">

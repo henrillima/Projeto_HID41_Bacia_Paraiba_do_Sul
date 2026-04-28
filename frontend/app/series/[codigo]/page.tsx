@@ -23,40 +23,54 @@ import { fmtMm } from "@/lib/utils";
 type TabKey = TipoSerie;
 const TABS: TabKey[] = ["diaria", "mensal", "anual", "max_diaria_anual"];
 
+const ANO_ATUAL = new Date().getFullYear();
+
 export default function SeriesPage() {
   const { codigo } = useParams<{ codigo: string }>();
   const [tab, setTab] = useState<TabKey>("diaria");
 
+  // Intervalo de tempo — padrão: últimos 10 anos
+  const [anoInicio, setAnoInicio] = useState(ANO_ATUAL - 9);
+  const [anoFim, setAnoFim] = useState(ANO_ATUAL);
+  const dataInicio = `${anoInicio}-01-01`;
+  const dataFim = `${anoFim}-12-31`;
+
   const { data: estacoes } = useEstacoes();
   const estacao = estacoes.find((e) => e.codigo === codigo);
 
-  const { data: diaria, loading: ldD } = useSerieDiaria(codigo);
+  const { data: diaria, loading: ldD } = useSerieDiaria(codigo, dataInicio, dataFim);
   const { data: mensal, loading: ldM } = useSerieMensal(codigo);
   const { data: anual, loading: ldA } = useSerieAnual(codigo);
   const { data: maxAnual, loading: ldMx } = useMaxDiariaAnual(codigo);
   const { data: histData, loading: ldH } = useHistograma(codigo, tab);
 
-  // Prepara dados para SerieTemporal por aba
+  // Prepara dados para SerieTemporal por aba (mensal/anual/max filtrados no frontend)
   const dadosDiaria = diaria.map((d) => ({
     label: d.data,
     valor: d.valor,
     preenchido: d.preenchido,
   }));
 
-  const dadosMensal = mensal.map((d) => ({
-    label: `${MES_ABREV[(d.mes ?? 1) - 1]}/${d.ano}`,
-    valor: d.valido ? d.valor : null,
-  }));
+  const dadosMensal = mensal
+    .filter((d) => d.ano >= anoInicio && d.ano <= anoFim)
+    .map((d) => ({
+      label: `${MES_ABREV[(d.mes ?? 1) - 1]}/${d.ano}`,
+      valor: d.valido ? d.valor : null,
+    }));
 
-  const dadosAnual = anual.map((d) => ({
-    label: String(d.ano),
-    valor: d.valido ? d.valor : null,
-  }));
+  const dadosAnual = anual
+    .filter((d) => d.ano >= anoInicio && d.ano <= anoFim)
+    .map((d) => ({
+      label: String(d.ano),
+      valor: d.valido ? d.valor : null,
+    }));
 
-  const dadosMax = maxAnual.map((d) => ({
-    label: String(d.ano),
-    valor: d.valor,
-  }));
+  const dadosMax = maxAnual
+    .filter((d) => d.ano >= anoInicio && d.ano <= anoFim)
+    .map((d) => ({
+      label: String(d.ano),
+      valor: d.valor,
+    }));
 
   type PontoDado = { label: string; valor: number | null; preenchido?: boolean };
   const dadosPorTab: Record<TabKey, PontoDado[]> = {
@@ -107,6 +121,50 @@ export default function SeriesPage() {
           {estacao?.is_referencia && (
             <p>Após preenchimento: <strong>{estacao.pct_falhas_pos_preenchimento?.toFixed(1)}%</strong></p>
           )}
+        </div>
+      </div>
+
+      {/* Seletor de intervalo de tempo */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-slate-50 px-4 py-3">
+        <span className="text-sm font-medium text-slate-600">Intervalo:</span>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={1900}
+            max={anoFim}
+            value={anoInicio}
+            onChange={(e) => setAnoInicio(Math.min(Number(e.target.value), anoFim))}
+            className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-center text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          />
+          <span className="text-slate-400">→</span>
+          <input
+            type="number"
+            min={anoInicio}
+            max={ANO_ATUAL}
+            value={anoFim}
+            onChange={(e) => setAnoFim(Math.max(Number(e.target.value), anoInicio))}
+            className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-center text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          />
+        </div>
+        <div className="ml-auto flex gap-2">
+          {[10, 20, 30].map((n) => (
+            <button
+              key={n}
+              onClick={() => { setAnoFim(ANO_ATUAL); setAnoInicio(ANO_ATUAL - n + 1); }}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+            >
+              {n} anos
+            </button>
+          ))}
+          <button
+            onClick={() => {
+              const inicio = estacao?.data_inicio?.slice(0, 4);
+              if (inicio) { setAnoInicio(Number(inicio)); setAnoFim(ANO_ATUAL); }
+            }}
+            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+          >
+            Série completa
+          </button>
         </div>
       </div>
 
