@@ -2,7 +2,9 @@
 
 import { useEstacoes } from "@/hooks/useEstacoes";
 import { usePreenchimento } from "@/hooks/usePreenchimento";
+import { useSerieDiaria } from "@/hooks/useSerieDiaria";
 import { ComparacaoMetodos } from "@/components/charts/ComparacaoMetodos";
+import { SerieTemporal } from "@/components/charts/SerieTemporal";
 import { Info } from "lucide-react";
 
 export default function PreenchimentoPage() {
@@ -10,8 +12,25 @@ export default function PreenchimentoPage() {
   const ref = estacoes.find((e) => e.is_referencia);
 
   const { data: resultados, vencedor, loading: ldP } = usePreenchimento(ref?.codigo ?? "");
+  const { data: diaria, loading: ldD } = useSerieDiaria(ref?.codigo ?? "");
 
   const loading = ldE || ldP;
+
+  // Dados para o gráfico da série corrigida
+  const dadosDiaria = diaria.map((d) => ({
+    label: d.data,
+    valor: d.valor,
+    preenchido: d.preenchido,
+  }));
+
+  const nPreenchidos = diaria.filter((d) => d.preenchido).length;
+  const nTotal       = diaria.length;
+  const pctPreench   = nTotal > 0 ? (nPreenchidos / nTotal * 100).toFixed(2) : "—";
+
+  // Período dos dias preenchidos
+  const diasPreench = diaria.filter((d) => d.preenchido);
+  const primeiroPreench = diasPreench[0]?.data?.slice(0, 10) ?? null;
+  const ultimoPreench   = diasPreench[diasPreench.length - 1]?.data?.slice(0, 10) ?? null;
 
   return (
     <div className="space-y-8">
@@ -82,7 +101,7 @@ export default function PreenchimentoPage() {
         )}
       </div>
 
-      {/* Interpretação */}
+      {/* Interpretação do vencedor */}
       {vencedor && !loading && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-slate-700">
           <p className="font-semibold text-emerald-800">Método aplicado à série final</p>
@@ -93,13 +112,64 @@ export default function PreenchimentoPage() {
             </strong>{" "}
             foi selecionado como vencedor por apresentar menor RMSE no conjunto de validação
             holdout ({vencedor.rmse_holdout.toFixed(4)} mm). Os {vencedor.n_dias_preenchidos} dias
-            preenchidos por este método estão destacados em laranja nas séries temporais diárias.
+            preenchidos por este método estão destacados em laranja no gráfico abaixo.
           </p>
           {vencedor.metodo === "regressao" && vencedor.r2 != null && (
             <p className="mt-2">
               R² no conjunto de treino: <strong>{vencedor.r2.toFixed(4)}</strong> —
               indica boa capacidade explicativa da equação linear.
             </p>
+          )}
+        </div>
+      )}
+
+      {/* Série diária com valores corrigidos */}
+      {ref && (
+        <div className="rounded-xl border bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-700">
+              Série diária corrigida — {ref.nome ?? ref.codigo}
+            </h2>
+            <div className="flex items-center gap-4 text-xs text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-6 rounded bg-[#1565C0]" />
+                Observado
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-6 rounded bg-orange-400" />
+                Preenchido
+              </span>
+            </div>
+          </div>
+
+          {ldD ? (
+            <div className="h-72 animate-pulse rounded-xl bg-slate-100" />
+          ) : diaria.length === 0 ? (
+            <p className="text-sm text-slate-400">Aguardando execução do pipeline.</p>
+          ) : (
+            <>
+              <SerieTemporal dados={dadosDiaria} maxPoints={2000} />
+
+              {/* Sumário dos valores preenchidos */}
+              {nPreenchidos > 0 && (
+                <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-3">
+                  <div className="rounded-lg bg-orange-50 border border-orange-200 p-3 text-center">
+                    <p className="text-2xl font-bold text-orange-600">{nPreenchidos}</p>
+                    <p className="text-xs text-orange-500">dias preenchidos</p>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 border p-3 text-center">
+                    <p className="text-2xl font-bold text-slate-700">{pctPreench}%</p>
+                    <p className="text-xs text-slate-400">do total da série</p>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 border p-3 text-center">
+                    <p className="text-sm font-semibold text-slate-700">
+                      {primeiroPreench} → {ultimoPreench}
+                    </p>
+                    <p className="text-xs text-slate-400">intervalo dos preenchimentos</p>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
