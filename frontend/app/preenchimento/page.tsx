@@ -8,7 +8,6 @@ import { usePreenchimento } from "@/hooks/usePreenchimento";
 import { useSerieDiaria } from "@/hooks/useSerieDiaria";
 import { ComparacaoMetodos } from "@/components/charts/ComparacaoMetodos";
 import { SeriePreenchimento, PontoPreenchimento } from "@/components/charts/SeriePreenchimento";
-import { SerieTemporal } from "@/components/charts/SerieTemporal";
 
 const ANO_ATUAL = new Date().getFullYear();
 
@@ -71,10 +70,14 @@ export default function PreenchimentoPage() {
   // Auxiliary station series (for when non-ref tab is active)
   const serieAuxAtiva = estacaoAtiva?.codigo === aux0?.codigo ? diariaAux0 : diariaAux1;
   const ldAuxAtiva    = estacaoAtiva?.codigo === aux0?.codigo ? ldD0 : ldD1;
-  const dadosAux = serieAuxAtiva.map((d) => ({
-    label: d.data.slice(0, 10),
-    valor: d.valor,
-  }));
+  const dadosAux = useMemo<PontoPreenchimento[]>(
+    () => serieAuxAtiva.map((d) => ({
+      label: d.data.slice(0, 10),
+      valor: d.valor,
+      preenchido: d.preenchido ?? false,
+    })),
+    [serieAuxAtiva],
+  );
 
   // Summary stats (reference only)
   const nPreenchidos    = diaria.filter((d) => d.preenchido).length;
@@ -308,7 +311,7 @@ export default function PreenchimentoPage() {
             ) : dadosAux.length === 0 ? (
               <p className="text-sm text-slate-400">Sem dados no período selecionado.</p>
             ) : (
-              <SerieTemporal dados={dadosAux} />
+              <SeriePreenchimento dados={dadosAux} maxPoints={2000} />
             )}
           </div>
         </>

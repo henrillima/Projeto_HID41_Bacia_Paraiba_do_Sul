@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Brush,
   CartesianGrid,
   Line,
   LineChart,
@@ -105,7 +104,6 @@ export function SerieTemporal({
           activeDot={{ r: 4 }}
           isAnimationActive={false}
         />
-        <Brush dataKey="label" height={24} stroke="#cbd5e1" travellerWidth={8} />
       </LineChart>
     </ResponsiveContainer>
   );

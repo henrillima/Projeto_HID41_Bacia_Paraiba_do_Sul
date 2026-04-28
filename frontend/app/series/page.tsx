@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Star } from "lucide-react";
 
 import { useEstacoes } from "@/hooks/useEstacoes";
@@ -8,15 +8,15 @@ import { useSerieDiaria } from "@/hooks/useSerieDiaria";
 import { useSerieMensal } from "@/hooks/useSerieMensal";
 import { useSerieAnual } from "@/hooks/useSerieAnual";
 import { useMaxDiariaAnual } from "@/hooks/useMaxDiariaAnual";
-import { useHistograma } from "@/hooks/useHistograma";
 
 import { SerieTemporal } from "@/components/charts/SerieTemporal";
+import { SeriePreenchimento } from "@/components/charts/SeriePreenchimento";
 import { Histograma } from "@/components/charts/Histograma";
 import { TabelaEstatisticas } from "@/components/TabelaEstatisticas";
 
 import type { TipoSerie } from "@/lib/types";
 import { TIPO_SERIE_LABELS, MES_ABREV } from "@/lib/types";
-import { fmtMm } from "@/lib/utils";
+import { fmtMm, computeHistogram } from "@/lib/utils";
 
 type TabKey = TipoSerie;
 const TABS: TabKey[] = ["diaria", "mensal", "anual", "max_diaria_anual"];
@@ -49,31 +49,39 @@ export default function SeriesPage() {
   const { data: mensal,   loading: ldM  } = useSerieMensal(codigo);
   const { data: anual,    loading: ldA  } = useSerieAnual(codigo);
   const { data: maxAnual, loading: ldMx } = useMaxDiariaAnual(codigo);
-  const { data: histData, loading: ldH  } = useHistograma(codigo, tab);
 
-  const dadosDiaria = diaria.map((d) => ({
-    label: d.data,
+  const dadosDiaria = useMemo(() => diaria.map((d) => ({
+    label: d.data.slice(0, 10),
     valor: d.valor,
-    preenchido: d.preenchido,
-  }));
+    preenchido: d.preenchido ?? false,
+  })), [diaria]);
 
-  const dadosMensal = mensal
-    .filter((d) => d.ano >= anoInicio && d.ano <= anoFim)
-    .map((d) => ({
-      label: `${MES_ABREV[(d.mes ?? 1) - 1]}/${d.ano}`,
-      valor: d.valido ? d.valor : null,
-    }));
+  const mensalFiltrado = useMemo(
+    () => mensal.filter((d) => d.ano >= anoInicio && d.ano <= anoFim),
+    [mensal, anoInicio, anoFim],
+  );
+  const anualFiltrado = useMemo(
+    () => anual.filter((d) => d.ano >= anoInicio && d.ano <= anoFim),
+    [anual, anoInicio, anoFim],
+  );
+  const maxFiltrado = useMemo(
+    () => maxAnual.filter((d) => d.ano >= anoInicio && d.ano <= anoFim),
+    [maxAnual, anoInicio, anoFim],
+  );
 
-  const dadosAnual = anual
-    .filter((d) => d.ano >= anoInicio && d.ano <= anoFim)
-    .map((d) => ({
-      label: String(d.ano),
-      valor: d.valido ? d.valor : null,
-    }));
+  const dadosMensal = useMemo(() => mensalFiltrado.map((d) => ({
+    label: `${MES_ABREV[(d.mes ?? 1) - 1]}/${d.ano}`,
+    valor: d.valido ? d.valor : null,
+  })), [mensalFiltrado]);
 
-  const dadosMax = maxAnual
-    .filter((d) => d.ano >= anoInicio && d.ano <= anoFim)
-    .map((d) => ({ label: String(d.ano), valor: d.valor }));
+  const dadosAnual = useMemo(() => anualFiltrado.map((d) => ({
+    label: String(d.ano),
+    valor: d.valido ? d.valor : null,
+  })), [anualFiltrado]);
+
+  const dadosMax = useMemo(() => maxFiltrado.map((d) => ({
+    label: String(d.ano), valor: d.valor,
+  })), [maxFiltrado]);
 
   type PontoDado = { label: string; valor: number | null; preenchido?: boolean };
   const dadosPorTab: Record<TabKey, PontoDado[]> = {
@@ -82,6 +90,19 @@ export default function SeriesPage() {
     anual: dadosAnual,
     max_diaria_anual: dadosMax,
   };
+
+  // Valores brutos de cada tab para cálculo dinâmico de stats e histograma
+  const valoresPorTab: Record<TabKey, (number | null)[]> = useMemo(() => ({
+    diaria:            diaria.map((d) => d.valor),
+    mensal:            mensalFiltrado.map((d) => d.valido ? d.valor : null),
+    anual:             anualFiltrado.map((d) => d.valido ? d.valor : null),
+    max_diaria_anual:  maxFiltrado.map((d) => d.valor),
+  }), [diaria, mensalFiltrado, anualFiltrado, maxFiltrado]);
+
+  const histDataDynamic = useMemo(() => {
+    const vals = valoresPorTab[tab];
+    return vals.length > 0 ? computeHistogram(vals, 20) : null;
+  }, [valoresPorTab, tab]);
 
   const loading = ldD || ldM || ldA || ldMx;
 
@@ -228,10 +249,18 @@ export default function SeriesPage() {
                     </>
                   )}
                 </h2>
-                <SerieTemporal
-                  dados={dadosPorTab[tab]}
-                  media={histData?.dados?.estatisticas?.media ?? undefined}
-                />
+                {tab === "diaria" ? (
+                  <SeriePreenchimento
+                    dados={dadosDiaria}
+                    media={histDataDynamic?.estatisticas?.media ?? undefined}
+                    maxPoints={2000}
+                  />
+                ) : (
+                  <SerieTemporal
+                    dados={dadosPorTab[tab]}
+                    media={histDataDynamic?.estatisticas?.media ?? undefined}
+                  />
+                )}
               </div>
 
               {/* Histograma + Estatísticas */}
@@ -239,21 +268,25 @@ export default function SeriesPage() {
                 <div className="rounded-xl border bg-white p-5 shadow-sm">
                   <h2 className="mb-4 text-sm font-semibold text-slate-700">
                     Histograma — {TIPO_SERIE_LABELS[tab]}
+                    <span className="ml-2 text-xs font-normal text-slate-400">intervalo selecionado</span>
                   </h2>
-                  {ldH ? (
+                  {loading ? (
                     <div className="h-48 animate-pulse rounded bg-slate-100" />
-                  ) : histData ? (
-                    <Histograma dados={histData.dados} />
+                  ) : histDataDynamic ? (
+                    <Histograma dados={histDataDynamic} />
                   ) : (
-                    <p className="text-sm text-slate-400">Sem dados de histograma.</p>
+                    <p className="text-sm text-slate-400">Sem dados no intervalo selecionado.</p>
                   )}
                 </div>
                 <div className="rounded-xl border bg-white p-5 shadow-sm">
-                  <h2 className="mb-4 text-sm font-semibold text-slate-700">Estatísticas descritivas</h2>
-                  {ldH ? (
+                  <h2 className="mb-4 text-sm font-semibold text-slate-700">
+                    Estatísticas descritivas
+                    <span className="ml-2 text-xs font-normal text-slate-400">intervalo selecionado</span>
+                  </h2>
+                  {loading ? (
                     <div className="h-48 animate-pulse rounded bg-slate-100" />
-                  ) : histData?.dados?.estatisticas ? (
-                    <TabelaEstatisticas est={histData.dados.estatisticas} />
+                  ) : histDataDynamic?.estatisticas ? (
+                    <TabelaEstatisticas est={histDataDynamic.estatisticas} />
                   ) : (
                     <p className="text-sm text-slate-400">Sem dados estatísticos.</p>
                   )}
