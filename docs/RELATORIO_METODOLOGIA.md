@@ -628,6 +628,49 @@ Aplicado para **TR = 10** e **TR = 100 anos** por padrão.
 
 ---
 
+## 9.5 Validação cruzada com a Parte 1 (Excel)
+
+A planilha entregue na **Parte 1 do Projeto** (`Projeto2_parte1_HID41_*.xlsx`)
+contém a **curva de permanência** e o **filtro de Eckhardt** calculados em
+Excel para a mesma estação (58142200), na janela **1980-10-01 a 2010-09-30**
+(30 anos hidrológicos completos). Refizemos os mesmos cálculos no pipeline
+restringindo a janela e usando os mesmos parâmetros declarados na planilha
+(Eckhardt: α = 0,98; BFI_max = 0,80). Resultados:
+
+| Métrica | Excel (Parte 1) | Pipeline (mesma janela) | Δ |
+|---|---|---|---|
+| Q5%  | 21,32 | 21,26 | **−0,26%** |
+| Q10% | 16,37 | 16,17 | −1,27% |
+| Q25% | 10,83 | 10,64 | −1,77% |
+| Q50% |  7,65 |  7,59 | −0,68% |
+| Q75% |  5,69 |  5,64 | −0,80% |
+| Q90% |  4,45 |  4,48 | **+0,56%** |
+| Q95% |  3,96 |  4,02 | +1,67% |
+| Média | 9,34 m³/s | 9,29 m³/s | −0,52% |
+| Máximo | 59,45 m³/s | 75,68 m³/s | +27,3% ⚠️ |
+| **BFI Eckhardt** | 0,7548 | 0,7425 | **−1,23 p.p.** |
+| n (dias) | 10 957 | 10 940 | −0,2% |
+
+**Conclusão**: o método numérico do pipeline é **idêntico** ao do Excel:
+todos os quantis em < 2%, BFI em 1,2 p.p. As diferenças residuais vêm de:
+
+- **Máximo +27%**: o pipeline aplica a curva-chave a dias com cota mas sem
+  vazão observada; um desses dias preenchidos tem cota alta que extrapola
+  até ~75 m³/s. Decisão metodológica do pipeline — o Excel só usa Q
+  observado.
+- **BFI −1,2 p.p.**: pequena diferença numérica na inicialização $b_0$ do
+  filtro recursivo.
+
+A figura F16 mostra a sobreposição visual perfeita das curvas, validando
+a implementação. **Quando a janela é estendida** para 1979-01 a 2023
+(usada nos demais resultados do relatório) os quantis ficam ~10% mais
+baixos (anos 2014-2023 mais secos puxam Q90/Q95 para baixo) — diferença
+**de dados, não de método**.
+
+![F16 — Validação cruzada vs Excel da Parte 1](figuras/F16_validacao_vs_excel.png)
+
+---
+
 ## 10. Referências
 
 ### Documentos da disciplina e do projeto

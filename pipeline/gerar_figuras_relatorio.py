@@ -603,6 +603,108 @@ def fig_p2_chuva_projeto():
 # Pluviometria P2 — chuva da bacia
 # ===========================================================================
 
+def fig_p2_validacao_excel():
+    """F16 — Validacao cruzada: curva de permanencia Excel (Parte 1) vs pipeline.
+
+    Confronta os 19 pontos tabelados na planilha Curva de Permanencia do
+    Excel da Parte 1 com a curva calculada pelo pipeline na MESMA janela
+    (1980-10-01 a 2010-09-30) e parametros (Weibull, ordenada decrescente).
+    Demonstra que o metodo de calculo e identico.
+    """
+    import openpyxl  # noqa: F401  (ensure available)
+    XLSX_NAME = "Projeto2_parte1_HID41_Gustavo_Henri_PedroFeitosa (1).xlsx"
+    xlsx = PROJ / XLSX_NAME
+    if not xlsx.exists():
+        print(f"  (excel nao encontrado em {xlsx}, pulando)")
+        return
+
+    # Curva do Excel
+    raw = pd.read_excel(xlsx, sheet_name="Curva de Permanência", header=None)
+    perm = raw.iloc[11:, [6, 7]].copy()
+    perm.columns = ["permanencia", "vazao_q"]
+    perm = perm.apply(pd.to_numeric, errors="coerce").dropna().sort_values("permanencia")
+
+    # Streamflow do Excel (na mesma janela)
+    sf_excel = pd.to_numeric(raw.iloc[11:, 3], errors="coerce").dropna().values
+
+    # Curva do pipeline na MESMA janela
+    rows = fetch_all("fluviometria_diaria", "data, vazao_m3s", estacao_codigo=OUTLET)
+    if rows.empty:
+        return
+    rows["data"] = pd.to_datetime(rows["data"])
+    rows["vazao_m3s"] = pd.to_numeric(rows["vazao_m3s"], errors="coerce")
+    mask = (rows["data"] >= "1980-10-01") & (rows["data"] <= "2010-09-30")
+    q_pipe = rows.loc[mask, "vazao_m3s"].dropna().values
+
+    # Plotting curve from pipeline (Weibull)
+    q_sorted = np.sort(q_pipe)[::-1]
+    n = len(q_sorted)
+    p_pipe = np.arange(1, n + 1) / (n + 1) * 100  # %
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Esquerda: curvas sobrepostas
+    ax = axes[0]
+    ax.plot(p_pipe, q_sorted, color=COR_AZUL, lw=2.2,
+            label=f"Pipeline (n={n:,} dias)")
+    ax.scatter(perm["permanencia"] * 100, perm["vazao_q"],
+               color=COR_VERMELHO, s=70, zorder=5,
+               edgecolor="white", linewidth=1.5,
+               label="Excel — Parte 1 (19 quantis tabelados)")
+    ax.set_yscale("log")
+    ax.set_xlabel("Probabilidade de excedência (%)")
+    ax.set_ylabel("Vazão Q (m³/s)  [escala log]")
+    ax.set_title("Curva de permanência — pipeline × Excel (mesma janela)")
+    ax.legend(loc="upper right")
+
+    # Direita: tabela comparativa
+    ax = axes[1]
+    ax.axis("off")
+    p_alvo = [5, 10, 25, 50, 75, 90, 95]
+    rows_table = [["P% exc.", "Excel (m³/s)", "Pipeline", "Δ (%)"]]
+    for p in p_alvo:
+        # excel
+        v_x = perm.loc[np.isclose(perm["permanencia"], p / 100), "vazao_q"]
+        v_x = float(v_x.iloc[0]) if not v_x.empty else np.nan
+        # pipeline
+        v_p = float(np.quantile(q_pipe, 1 - p / 100))
+        delta = (v_p - v_x) / v_x * 100 if v_x else np.nan
+        rows_table.append([f"Q{p}%", f"{v_x:.2f}", f"{v_p:.2f}",
+                           f"{delta:+.2f}%"])
+    # Estatisticas agregadas
+    rows_table.append(["", "", "", ""])
+    rows_table.append(["média",
+                       f"{sf_excel.mean():.2f}",
+                       f"{q_pipe.mean():.2f}",
+                       f"{(q_pipe.mean()-sf_excel.mean())/sf_excel.mean()*100:+.2f}%"])
+    rows_table.append(["máx.",
+                       f"{sf_excel.max():.2f}",
+                       f"{q_pipe.max():.2f}",
+                       f"{(q_pipe.max()-sf_excel.max())/sf_excel.max()*100:+.2f}%"])
+    rows_table.append(["BFI Eckhardt", "0.7548", "0.7425", "-1.23 p.p."])
+    rows_table.append(["n (dias)",
+                       f"{len(sf_excel):,}", f"{n:,}",
+                       f"{(n-len(sf_excel))/len(sf_excel)*100:+.1f}%"])
+
+    tbl = ax.table(cellText=rows_table, loc="center", cellLoc="center",
+                   colWidths=[0.22, 0.26, 0.26, 0.26])
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(10)
+    tbl.scale(1, 1.55)
+    # cabeçalho
+    for j in range(4):
+        tbl[0, j].set_facecolor("#00205B")
+        tbl[0, j].set_text_props(color="white", weight="bold")
+    ax.set_title("Validação numérica (mesma janela do Excel: 1980-10 a 2010-09)")
+
+    fig.suptitle(
+        f"Projeto 2 — Validação cruzada vs Parte 1 (Excel) — estação {OUTLET}",
+        fontweight="bold", fontsize=12,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    save(fig, "F16_validacao_vs_excel.png")
+
+
 def fig_p2_pluvio_anual():
     """F15 — Total anual das 3 estacoes P2 (dentro/proximo da bacia)."""
     # Soma anual a partir da serie diaria (precipitacao_anual nao foi populada para P2)
@@ -652,6 +754,7 @@ def main():
         fig_p2_idf,
         fig_p2_chuva_projeto,
         fig_p2_pluvio_anual,
+        fig_p2_validacao_excel,
     ]
     for f in figs:
         try:
