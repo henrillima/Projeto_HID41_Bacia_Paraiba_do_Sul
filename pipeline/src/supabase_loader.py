@@ -900,3 +900,57 @@ def insert_preenchimento(
         f"[preenchimento] {metodo} | RMSE={resultado.get('rmse_holdout'):.4f} | "
         f"vencedor={is_vencedor}"
     )
+
+
+# ===========================================================================
+# Pluviometria — Projeto 2 (chuva-vazão)
+# ===========================================================================
+
+def upsert_estacao_pluvio_p2(client: Client, dados: dict) -> None:
+    """Upsert idempotente em `estacoes` marcando a linha como Projeto 2.
+
+    Garante que `projeto = 'P2'` é gravado mesmo se o caller esquecer.
+    Estações P2 não aparecem em /estacoes nem /dashboard (a view
+    `resumo_estacoes` filtra por `projeto = 'P1'`).
+    """
+    payload = dict(dados)
+    payload["projeto"] = "P2"
+    client.table("estacoes").upsert(_sanitize_record(payload)).execute()
+    logger.info(f"[upsert_estacao_p2] {payload.get('codigo')} - {payload.get('nome')}")
+
+
+def insert_candidatas_pluvio_p2(
+    client: Client,
+    df: pd.DataFrame,
+    batch_size: int = 500,
+) -> int:
+    """Persiste o ranking de pluviômetros candidatos em
+    `estacoes_candidatas_pluvio_p2` (idempotente via upsert)."""
+    if df.empty:
+        return 0
+    cols = [
+        "codigo", "nome", "lat", "lon", "altitude",
+        "anos_dados", "data_inicio", "data_fim",
+        "operando", "operadora", "bacia_nome", "sub_bacia_pref",
+        "dist_exutorio_km", "dist_centroide_bacia_km",
+        "score_anos", "score_falhas", "score_proximidade", "score",
+    ]
+    records = []
+    for _, row in df.iterrows():
+        rec: dict[str, Any] = {}
+        for c in cols:
+            if c not in df.columns:
+                continue
+            v = row.get(c)
+            if isinstance(v, bool):
+                rec[c] = bool(v)
+            elif isinstance(v, (int, np.integer)):
+                rec[c] = int(v)
+            elif isinstance(v, (float, np.floating)):
+                rec[c] = _nan_to_none(float(v))
+            else:
+                rec[c] = None if (v is None or (isinstance(v, float) and pd.isna(v))) else str(v)
+        records.append(rec)
+    n = _batch_insert(client, "estacoes_candidatas_pluvio_p2", records, batch_size, upsert=True)
+    logger.info(f"[candidatas_pluvio_p2] {n} registros")
+    return n

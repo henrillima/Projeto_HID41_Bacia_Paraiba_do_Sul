@@ -140,17 +140,34 @@ frequencia:
   ic_nivel: 0.90
 
 # ---------------------------------------------------------------------------
-# IDF — equação regional pré-publicada (substitua pela fonte confirmada)
+# IDF — equação publicada para São José dos Campos
+#
+# Forma Pfafstetter: i = a · TR^b / (t + c)^d
+#   i  : intensidade (mm/h)
+#   TR : tempo de retorno (anos)
+#   t  : duração (min)
+#
+# Parâmetros validados por checagem cruzada de 5 pontos contra a Tabela 6
+# de Ferreira & Waltz (2001):
+#   (t=10, TR=2) =  96,1 mm/h  ✓
+#   (t=20, TR=2) =  78,4 mm/h  ✓
+#   (t=60, TR=10)=  54,7 mm/h  ✓
+#   (t=10, TR=20)= 128,5 mm/h  ✓
+#   (t=1440,TR=20)= 3,2 mm/h   ✓
+#
+# Validade declarada: TR ≤ 20 anos, t ≤ 360 min (6 h).
+# Para TR=100 (chuva_projeto), há extrapolação. Documentar essa limitação
+# no relatório — a forma é estável mas o IC se alarga muito além de TR=20.
 # ---------------------------------------------------------------------------
 idf:
   regiao: sjc-paraiba-do-sul
   equacao: pfafstetter
-  fonte: "Pfafstetter / DNOS — São José dos Campos (placeholder; confirmar)"
+  fonte: "Ferreira, M. E. & Waltz, R. C. (2001). Obtenção de uma equação de chuvas intensas para São José dos Campos-SP. XIV Simpósio Brasileiro de Recursos Hídricos, ABRH. Série 1973-1984 + 1993-1998 (16 anos)."
   parametros:
-    a: 1239.7
-    b: 0.181
-    c: 22.0
-    d: 0.890
+    a: 5710.0     # K — coeficiente multiplicativo
+    b: 0.1263     # m — expoente de TR
+    c: 38.21      # b — deslocamento na duração
+    d: 1.0766     # n — expoente de (t + c)
   duracoes_min: [5, 10, 15, 30, 60, 120, 360, 720, 1440]
 
 # ---------------------------------------------------------------------------

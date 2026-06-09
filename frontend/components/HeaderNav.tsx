@@ -23,13 +23,14 @@ const PLUVIO: Group = {
 
 const FLUVIO: Group = {
   label: "Fluviometria",
-  match: ["/selecao-fluvio", "/fluviometria", "/regime", "/eventos", "/extremos"],
+  match: ["/selecao-fluvio", "/selecao-pluvio-p2", "/fluviometria", "/regime", "/eventos", "/extremos"],
   items: [
-    { href: "/selecao-fluvio", label: "Exutório",       desc: "Seleção da estação fluviométrica de exutório" },
-    { href: "/fluviometria",   label: "Séries de Vazão", desc: "Diária, mensal, anual e curva-chave" },
-    { href: "/regime",         label: "Regime",         desc: "Curva de permanência e separação Eckhardt" },
-    { href: "/eventos",        label: "Eventos",        desc: "Isolamento de eventos e hidrograma unitário" },
-    { href: "/extremos",       label: "Extremos",       desc: "Frequência de cheias, low-flow e IDF" },
+    { href: "/selecao-fluvio",   label: "Exutório",        desc: "Seleção da estação fluviométrica de exutório" },
+    { href: "/selecao-pluvio-p2", label: "Pluviômetros P2", desc: "Estações pluviométricas dentro/perto da bacia (chuva-vazão)" },
+    { href: "/fluviometria",     label: "Séries de Vazão", desc: "Diária, mensal, anual e curva-chave" },
+    { href: "/regime",           label: "Regime",          desc: "Curva de permanência e separação Eckhardt" },
+    { href: "/eventos",          label: "Eventos",         desc: "Isolamento de eventos e hidrograma unitário" },
+    { href: "/extremos",         label: "Extremos",        desc: "Frequência de cheias, low-flow e IDF" },
   ],
 };
 

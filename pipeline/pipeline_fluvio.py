@@ -648,13 +648,53 @@ def _processar_extremos(client_supa, codigo: str, df_diaria: pd.DataFrame) -> No
 
 
 def _carregar_chuva_media_bacia(client_supa) -> pd.Series:
-    """Carrega a chuva diária média da bacia (média das estações pluvio)."""
-    rows = (
-        client_supa.table("precipitacao_diaria")
-        .select("data, valor, estacao_codigo")
-        .execute()
-        .data
-    )
+    """Carrega a chuva diária média da bacia para a Fase 3 (chuva-vazão).
+
+    Prioriza os pluviômetros marcados ativos em `config_pluviometros_p2`
+    (escolhidos próximos da bacia do Projeto 2 via /selecao-pluvio-p2).
+    Se a tabela estiver vazia, faz fallback para o comportamento antigo
+    (média de TODAS as estações em `precipitacao_diaria`) — útil em ambientes
+    onde os pluviômetros P2 ainda não foram configurados.
+    """
+    try:
+        cfg_rows = (
+            client_supa.table("config_pluviometros_p2")
+            .select("codigo")
+            .eq("ativo", True)
+            .execute()
+            .data
+        )
+    except Exception as exc:
+        logger.warning(
+            f"config_pluviometros_p2 indisponível ({exc}); usando todas "
+            f"as estações pluvio (FALLBACK)."
+        )
+        cfg_rows = []
+
+    codigos_p2 = [str(r["codigo"]) for r in cfg_rows if r.get("codigo")]
+    if codigos_p2:
+        logger.info(
+            f"Chuva média da bacia P2 com {len(codigos_p2)} estação(ões): {codigos_p2}"
+        )
+        rows = (
+            client_supa.table("precipitacao_diaria")
+            .select("data, valor, estacao_codigo")
+            .in_("estacao_codigo", codigos_p2)
+            .execute()
+            .data
+        )
+    else:
+        logger.warning(
+            "config_pluviometros_p2 vazio — usando média de TODAS as estações "
+            "em precipitacao_diaria (FALLBACK; chuva pode não representar a bacia)."
+        )
+        rows = (
+            client_supa.table("precipitacao_diaria")
+            .select("data, valor, estacao_codigo")
+            .execute()
+            .data
+        )
+
     if not rows:
         return pd.Series(dtype=float)
     df = pd.DataFrame(rows)

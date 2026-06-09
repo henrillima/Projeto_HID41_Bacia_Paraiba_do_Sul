@@ -273,6 +273,42 @@ export interface ConfigEstacaoFluvio {
   selecionado_em?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Pluviômetros do Projeto 2 (chuva-vazão da bacia do exutório fluvio)
+// ---------------------------------------------------------------------------
+
+export interface EstacaoCandidataPluvioP2 {
+  codigo: string;
+  nome: string | null;
+  lat: number | null;
+  lon: number | null;
+  altitude: number | null;
+  anos_dados: number | null;
+  data_inicio: string | null;
+  data_fim: string | null;
+  operando: boolean | null;
+  operadora: string | null;
+  bacia_nome: string | null;
+  sub_bacia_pref: string | null;
+  dist_exutorio_km: number | null;
+  dist_centroide_bacia_km: number | null;
+  score_anos: number | null;
+  score_falhas: number | null;
+  score_proximidade: number | null;
+  score: number | null;
+}
+
+export interface ConfigPluviometroP2 {
+  codigo: string;
+  nome: string | null;
+  lat: number | null;
+  lon: number | null;
+  altitude: number | null;
+  ativo: boolean;
+  is_referencia: boolean;
+  selecionado_em?: string;
+}
+
 // ===========================================================================
 // Projeto 2 / Fase 2 — Regime de vazões
 // ===========================================================================

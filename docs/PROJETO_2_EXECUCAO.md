@@ -80,6 +80,31 @@ Opção C — passar código direto:
 .venv/Scripts/python.exe pipeline_fluvio.py --codigos 58183000
 ```
 
+### 4.1.5 Selecionar pluviômetros do Projeto 2 (chuva-vazão da bacia)
+
+Os 3 pluviômetros do Projeto 1 (Pindamonhangaba/Estrada do Cunha/SLP) estão
+51–90 km da bacia do Buquira → não representam a chuva sobre a bacia. Para a
+Fase 3 (eventos chuva-vazão, HU observado, φ-index) precisamos de estações
+**dentro/perto** da bacia. O BI do Projeto 1 fica intocado (view
+`resumo_estacoes` filtra por `projeto = 'P1'`).
+
+```bash
+# 1) Descobrir candidatas (UF=SP, bacia 5, prefixos 02244/02245/02344/02345)
+.venv/Scripts/python.exe download_pluvio_p2.py discover --top 15
+
+# 2) Abrir /selecao-pluvio-p2 no front e ativar 1-3 estações
+#    (priorizar dist_exutorio_km < 25 km, anos_dados ≥ 30)
+
+# 3) Baixar as séries das estações ativas (via REST HidroWebService)
+.venv/Scripts/python.exe download_pluvio_p2.py baixar --do-config
+```
+
+As séries gravadas vão para `precipitacao_diaria` (mesma tabela usada pelo
+Projeto 1), mas as estações entram em `estacoes` com `projeto = 'P2'`. O
+`pipeline_fluvio.py::_carregar_chuva_media_bacia()` lê preferencialmente
+`config_pluviometros_p2.ativo = true`; se vazio, faz fallback ruidoso para
+"média de todas as estações" (compatível com o estado anterior).
+
 ### 4.2 Configurar parâmetros físicos da bacia (necessário para Fase 3)
 
 Edite [`pipeline/config.yaml`](../pipeline/config.yaml), bloco `bacia:`:
