@@ -102,7 +102,11 @@ def save(fig, name: str):
 # ===========================================================================
 
 def fig_p1_series_anual():
-    """F02 — Total anual de precipitacao das 3 estacoes P1."""
+    """F02 — Total anual de precipitacao das 3 estacoes P1.
+
+    Insere NaN para anos sem registro (quebra visual da linha) e marca
+    visualmente o ano-marco da crise hidrica do Sudeste (2014).
+    """
     df = fetch_all("precipitacao_anual", "estacao_codigo, ano, valor, valido",
                    estacao_codigo=PLUVIOS_P1)
     if df.empty:
@@ -112,14 +116,24 @@ def fig_p1_series_anual():
              "2245055": "Estrada do Cunha",
              "2345065": "São Luís do Paraitinga"}
     fig, ax = plt.subplots()
+    ano_min = int(df["ano"].min())
+    ano_max = int(df["ano"].max())
+    anos_completos = range(ano_min, ano_max + 1)
     for cod, grp in df.groupby("estacao_codigo"):
-        grp = grp.sort_values("ano")
-        ax.plot(grp["ano"], grp["valor"], marker="o", ms=4,
+        grp = grp.sort_values("ano").set_index("ano")
+        # Reindexa para incluir TODOS os anos no range; gaps viram NaN
+        serie = grp["valor"].reindex(anos_completos)
+        ax.plot(serie.index, serie.values, marker="o", ms=4,
                 label=nomes.get(cod, cod), lw=1.5)
-    ax.set_title("Projeto 1 — Precipitação total anual (mm)")
+    # Anotacao da crise hidrica 2014
+    ax.axvspan(2013.5, 2014.5, color=COR_VERMELHO, alpha=0.10, zorder=0)
+    ax.annotate("crise hídrica\n2013/2014", xy=(2014, 700),
+                ha="center", fontsize=9, color=COR_VERMELHO,
+                fontweight="bold")
+    ax.set_title("Projeto 1 — Precipitação total anual (mm) — anos válidos (≥95% de cobertura)")
     ax.set_xlabel("Ano")
     ax.set_ylabel("Precipitação anual (mm)")
-    ax.legend(loc="lower left", ncol=3)
+    ax.legend(loc="upper right", ncol=1, fontsize=9)
     save(fig, "F02_pluvio_p1_anual.png")
 
 
@@ -243,34 +257,56 @@ def fig_p2_curva_chave():
 
 
 def fig_p2_serie_vazao():
-    """F06 — Serie diaria e media mensal de vazao."""
-    diaria = fetch_all("fluviometria_diaria", "data, vazao_m3s",
+    """F06 — Serie diaria e media mensal de vazao.
+
+    Diferencia visualmente a vazao observada da preenchida pela curva-chave
+    (cota -> Q). Quebra a linha mensal nos meses invalidos (gaps).
+    """
+    diaria = fetch_all("fluviometria_diaria",
+                       "data, vazao_m3s, preenchido",
                        estacao_codigo=OUTLET)
     mensal = fetch_all("fluviometria_mensal",
-                       "ano, mes, vazao_media",
+                       "ano, mes, vazao_media, valido",
                        estacao_codigo=OUTLET)
     if diaria.empty:
         return
     diaria["data"] = pd.to_datetime(diaria["data"])
-    diaria = diaria.sort_values("data")
+    diaria["vazao_m3s"] = pd.to_numeric(diaria["vazao_m3s"], errors="coerce")
+    diaria = diaria.sort_values("data").reset_index(drop=True)
 
     if not mensal.empty:
         mensal["data"] = pd.to_datetime(
             mensal["ano"].astype(str) + "-" +
             mensal["mes"].astype(str).str.zfill(2) + "-15"
         )
+        mensal["vazao_media"] = pd.to_numeric(mensal["vazao_media"], errors="coerce")
+        # Quebra a linha: zera meses invalidos com NaN
+        mensal.loc[~mensal["valido"].fillna(False), "vazao_media"] = np.nan
         mensal = mensal.sort_values("data")
 
     fig, ax = plt.subplots()
+    # Diaria — observada vs preenchida em cores distintas
+    obs = diaria[diaria["preenchido"] != True]
+    pre = diaria[diaria["preenchido"] == True]
     ax.fill_between(diaria["data"], 0, diaria["vazao_m3s"],
-                     alpha=0.18, color=COR_AZUL2, label="diária")
+                    alpha=0.10, color="#cbd5e1", label="_nolegend_")
+    if not obs.empty:
+        ax.vlines(obs["data"], 0, obs["vazao_m3s"], colors=COR_AZUL2,
+                  alpha=0.30, lw=0.5, label=f"diária observada ({len(obs):,} d)")
+    if not pre.empty:
+        ax.vlines(pre["data"], 0, pre["vazao_m3s"], colors=COR_AMBAR,
+                  alpha=0.55, lw=0.6,
+                  label=f"diária preenchida via curva-chave ({len(pre):,} d)")
     if not mensal.empty:
         ax.plot(mensal["data"], mensal["vazao_media"], color=COR_AZUL,
-                lw=1.3, label="média mensal")
+                lw=1.4, label="média mensal (meses válidos)")
+
     ax.set_xlabel("Ano")
     ax.set_ylabel("Vazão Q (m³/s)")
-    ax.set_title(f"Projeto 2 — série de vazão {OUTLET} (Buquirinha II)")
-    ax.legend(loc="upper left")
+    ax.set_title(f"Projeto 2 — série de vazão {OUTLET} (Buquirinha II)\n"
+                 f"observada × preenchida pela curva-chave",
+                 fontsize=11)
+    ax.legend(loc="upper left", fontsize=9)
     save(fig, "F06_serie_vazao.png")
 
 
@@ -706,8 +742,12 @@ def fig_p2_validacao_excel():
 
 
 def fig_p2_pluvio_anual():
-    """F15 — Total anual das 3 estacoes P2 (dentro/proximo da bacia)."""
-    # Soma anual a partir da serie diaria (precipitacao_anual nao foi populada para P2)
+    """F15 — Total anual das 3 estacoes P2 (dentro/proximo da bacia).
+
+    Filtra anos com cobertura >= 330 dias (≥90% do ano). Insere NaN nos
+    anos faltantes para que a linha quebre visualmente (em vez de
+    interpolar gaps).
+    """
     df = fetch_all("precipitacao_diaria", "estacao_codigo, data, valor",
                    estacao_codigo=PLUVIOS_P2)
     if df.empty:
@@ -715,21 +755,38 @@ def fig_p2_pluvio_anual():
     df["data"] = pd.to_datetime(df["data"])
     df["ano"] = df["data"].dt.year
     nomes = {"2245054": "Monteiro Lobato (22,6 km — cabeceiras)",
-             "2345064": "Buquirinha (1,3 km — dentro da bacia)",
+             "2345064": "Buquirinha (1,3 km — dentro da bacia, histórica)",
              "2345019": "São José dos Campos (7,0 km — foz)"}
+    cores = {"2245054": COR_AZUL, "2345064": COR_VERDE, "2345019": COR_AMBAR}
 
     fig, ax = plt.subplots()
+    # Range comum: do menor ao maior ano com dado VÁLIDO em qualquer estação
+    ano_min = ano_max = None
     for cod, grp in df.groupby("estacao_codigo"):
-        anu = grp.groupby("ano")["valor"].sum().reset_index()
-        # so anos com >300 dias
         cont = grp.groupby("ano").size()
-        anu = anu[anu["ano"].isin(cont[cont >= 300].index)]
-        ax.plot(anu["ano"], anu["valor"], marker="o", ms=4,
-                label=nomes.get(cod, cod), lw=1.5)
-    ax.set_title("Projeto 2 — Pluviômetros P2 — precipitação total anual (chuva-vazão)")
+        anos_ok = cont[cont >= 330].index
+        if len(anos_ok):
+            a, b = int(anos_ok.min()), int(anos_ok.max())
+            ano_min = min(ano_min, a) if ano_min else a
+            ano_max = max(ano_max, b) if ano_max else b
+    if ano_min is None:
+        return
+    anos_range = range(ano_min, ano_max + 1)
+
+    for cod, grp in df.groupby("estacao_codigo"):
+        anu = grp.groupby("ano").agg(soma=("valor","sum"), n=("valor","size"))
+        # Marca como NaN os anos com cobertura insuficiente
+        anu.loc[anu["n"] < 330, "soma"] = np.nan
+        serie = anu["soma"].reindex(anos_range)
+        ax.plot(serie.index, serie.values, marker="o", ms=5,
+                color=cores.get(cod), label=nomes.get(cod, cod), lw=1.6)
+
+    ax.set_title("Projeto 2 — Pluviômetros P2 — precipitação total anual\n"
+                 "(somente anos com ≥330 dias de registro; gaps mostrados como quebra)",
+                 fontsize=11)
     ax.set_xlabel("Ano")
     ax.set_ylabel("Precipitação anual (mm)")
-    ax.legend(loc="lower left")
+    ax.legend(loc="upper right", fontsize=9)
     save(fig, "F15_pluvio_p2_anual.png")
 
 
