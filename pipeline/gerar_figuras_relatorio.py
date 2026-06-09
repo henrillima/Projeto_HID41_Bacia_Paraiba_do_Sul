@@ -416,9 +416,12 @@ def fig_p2_eventos():
 
 
 def fig_p2_hu_observado_vs_scs():
-    """F11 — HU observado medio vs HU SCS triangular."""
-    # HU observado: pegar o HU MEDIO (linha com n_eventos preenchido) ou
-    # qualquer linha se nao houver media
+    """F11 — HU observado medio vs HU SCS triangular.
+
+    Comparacao em malha DIARIA (a do observado): o SCS horario eh agregado
+    para dias somando suas ordenadas por janela de 24 h. Em paralelo,
+    mostra-se o SCS na malha horaria nativa em painel separado.
+    """
     huo_rows = client.table("hidrograma_unitario_observado").select(
         "dt_dias, ordenadas_m3s_per_mm, n_eventos").eq(
         "estacao_codigo", OUTLET).execute().data
@@ -429,30 +432,65 @@ def fig_p2_hu_observado_vs_scs():
 
     if not huo_rows and not huscs:
         return
-    fig, ax = plt.subplots()
 
-    if huo_rows:
-        # priorizar HU medio (n_eventos > 0)
-        huo_medio = next((h for h in huo_rows if h.get("n_eventos")), huo_rows[0])
-        ordenadas = huo_medio.get("ordenadas_m3s_per_mm") or []
-        dt_dias = huo_medio.get("dt_dias", 1)
-        if ordenadas:
-            tempo_h = np.arange(len(ordenadas)) * dt_dias * 24.0
-            ax.plot(tempo_h, ordenadas, color=COR_AZUL, lw=2.2,
-                    marker="o", ms=4,
-                    label=f"HU observado médio (n={huo_medio.get('n_eventos','?')} eventos)")
+    # Prepara HU observado (diario)
+    huo_medio = next((h for h in huo_rows if h.get("n_eventos")), huo_rows[0]) if huo_rows else None
+    huo_ords = huo_medio.get("ordenadas_m3s_per_mm") if huo_medio else None
+    huo_dt_dias = huo_medio.get("dt_dias", 1) if huo_medio else 1
 
-    if huscs:
-        s = huscs[0]
-        tempos = s.get("tempos_h") or []
-        ords   = s.get("ordenadas_m3s_per_mm") or []
-        if tempos and ords:
-            ax.plot(tempos, ords, color=COR_VERMELHO, lw=2.2, ls="--",
-                    label=f"HU SCS triangular (tc={float(s.get('tc_min',0)):.0f} min)")
+    # Prepara HU SCS (horario nativo)
+    scs = huscs[0] if huscs else None
+    scs_tempos_h = scs.get("tempos_h") if scs else None
+    scs_ords     = scs.get("ordenadas_m3s_per_mm") if scs else None
+    scs_dt_min   = float(scs.get("dt_min", 60)) if scs else 60
+    scs_tc_min   = float(scs.get("tc_min", 0)) if scs else 0
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    # --- Painel 1: HU observado medio (escala diaria, com Tp do SCS indicado) ---
+    ax = axes[0]
+    huo_tp_dias = None
+    if huo_ords:
+        tempo_dia = np.arange(len(huo_ords)) * huo_dt_dias
+        ax.plot(tempo_dia, huo_ords, color=COR_AZUL, lw=2.2, marker="o", ms=5,
+                label=f"HU observado médio (n={huo_medio.get('n_eventos','?')} eventos)")
+        # truncar a janela ao que importa (ate decaimento)
+        n_show = min(len(huo_ords), 25)
+        ax.set_xlim(0, n_show * huo_dt_dias)
+        # Tp empirico
+        i_peak = int(np.argmax(huo_ords))
+        huo_tp_dias = i_peak * huo_dt_dias
+        ax.axvline(huo_tp_dias, color=COR_AZUL, ls=":", alpha=0.6,
+                   label=f"Tp obs. ≈ {huo_tp_dias:.0f} dias")
+
+    if scs and scs.get("t_pico_h") is not None:
+        tp_scs_dias = float(scs["t_pico_h"]) / 24.0
+        ax.axvline(tp_scs_dias, color=COR_VERMELHO, ls="--", lw=2,
+                   label=f"Tp SCS ≈ {float(scs['t_pico_h']):.1f} h ({tp_scs_dias:.2f} d)")
+    ax.set_xlabel("Tempo (dias)")
+    ax.set_ylabel("q (m³/s/mm)")
+    ax.set_title("HU observado médio — malha diária")
+    ax.legend(loc="upper right", fontsize=9)
+
+    # --- Painel 2: HU SCS em malha horaria nativa ---
+    ax = axes[1]
+    if scs_tempos_h and scs_ords:
+        ax.plot(scs_tempos_h, scs_ords, color=COR_VERMELHO, lw=2.2,
+                label=f"HU SCS triangular (Δt={scs_dt_min:.0f} min)")
+        ax.fill_between(scs_tempos_h, 0, scs_ords, color=COR_VERMELHO, alpha=0.18)
     ax.set_xlabel("Tempo (h)")
     ax.set_ylabel("q (m³/s/mm)")
-    ax.set_title(f"Projeto 2 — Hidrograma Unitário (1 mm efetivo) — {OUTLET}")
-    ax.legend()
+    ax.set_title(f"HU SCS sintético — tc Kirpich = {scs_tc_min:.0f} min")
+    ax.legend(loc="upper right", fontsize=9)
+    ax.set_xlim(left=0)
+
+    fig.suptitle(
+        f"Projeto 2 — Hidrograma Unitário (1 mm efetivo) — estação {OUTLET}\n"
+        f"escalas distintas: observado em DIAS (Δt da série), SCS em HORAS — "
+        f"comparação direta inválida; reportar Tp lado-a-lado",
+        fontweight="bold", fontsize=11,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.90])
     save(fig, "F11_hu_observado_vs_scs.png")
 
 
@@ -537,23 +575,27 @@ def fig_p2_chuva_projeto():
     rows = client.table("chuva_projeto").select("*").execute().data
     if not rows:
         return
-    fig, axes = plt.subplots(1, 2, figsize=(13, 4.5), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5.0), sharey=True)
     for ax, tr in zip(axes, [10, 100]):
         r = next((x for x in rows if int(x.get("tr", -1)) == tr), None)
         if not r or not r.get("hietograma"):
             continue
         df = pd.DataFrame(r["hietograma"])
-        # campo de chuva pode ser p_mm ou chuva_mm
         col_p = "p_mm" if "p_mm" in df.columns else "chuva_mm"
         ax.bar(df["t_min"], df[col_p], width=float(r.get("dt_min", 10)) * 0.85,
                color=COR_AZUL2 if tr == 10 else COR_VERMELHO, alpha=0.85,
                edgecolor="white")
         ax.set_xlabel("Tempo (min)")
-        ax.set_ylabel("Precipitação (mm)" if tr == 10 else "")
-        ax.set_title(f"TR = {tr} anos — total = {df[col_p].sum():.1f} mm  "
-                     f"|  Δt = {r.get('dt_min', '?')} min  |  padrão {r.get('padrao', '?')}")
-    fig.suptitle("Projeto 2 — Chuva de projeto (blocos alternados) — SJC",
-                 y=1.02, fontweight="bold")
+        if tr == 10:
+            ax.set_ylabel("Precipitação no bloco (mm)")
+        ax.set_title(
+            f"TR = {tr} anos  ·  total = {df[col_p].sum():.1f} mm\n"
+            f"Δt = {r.get('dt_min', '?')} min  |  padrão {r.get('padrao', '?')}",
+            fontsize=11,
+        )
+    fig.suptitle("Projeto 2 — Chuva de projeto (blocos alternados) — São José dos Campos",
+                 fontweight="bold", fontsize=13)
+    fig.tight_layout(rect=[0, 0, 1, 0.93])
     save(fig, "F14_chuva_projeto.png")
 
 

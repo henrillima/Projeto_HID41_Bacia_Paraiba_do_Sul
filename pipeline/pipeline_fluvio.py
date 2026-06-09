@@ -676,24 +676,33 @@ def _carregar_chuva_media_bacia(client_supa) -> pd.Series:
         logger.info(
             f"Chuva média da bacia P2 com {len(codigos_p2)} estação(ões): {codigos_p2}"
         )
-        rows = (
-            client_supa.table("precipitacao_diaria")
-            .select("data, valor, estacao_codigo")
-            .in_("estacao_codigo", codigos_p2)
-            .execute()
-            .data
-        )
     else:
         logger.warning(
             "config_pluviometros_p2 vazio — usando média de TODAS as estações "
             "em precipitacao_diaria (FALLBACK; chuva pode não representar a bacia)."
         )
-        rows = (
+
+    # Paginação manual: Supabase limita 1000 registros por query, e a junção
+    # de 3 estações × ~16k dias é ~50k registros. Sem isso, a chuva fica
+    # truncada e a Fase 3 perde a maioria dos eventos.
+    PAGE = 1000
+    offset = 0
+    rows: list[dict] = []
+    while True:
+        q = (
             client_supa.table("precipitacao_diaria")
             .select("data, valor, estacao_codigo")
-            .execute()
-            .data
+            .range(offset, offset + PAGE - 1)
         )
+        if codigos_p2:
+            q = q.in_("estacao_codigo", codigos_p2)
+        chunk = q.execute().data or []
+        if not chunk:
+            break
+        rows.extend(chunk)
+        if len(chunk) < PAGE:
+            break
+        offset += PAGE
 
     if not rows:
         return pd.Series(dtype=float)

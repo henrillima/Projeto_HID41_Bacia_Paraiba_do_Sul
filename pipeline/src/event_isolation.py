@@ -137,8 +137,13 @@ def identificar_eventos(
             cortes["duracao"] += 1
             continue
 
-        # Chuva acumulada do evento (inclui dia anterior ao início para captar lag)
-        p_inicio = df.loc[ini, "data"] - timedelta(days=1)
+        # Chuva acumulada do evento: do lag estimado antes do pico até o pico.
+        # Para bacias com tc longo a chuva geradora pode estar 3-5 dias antes do
+        # início do recuo de Q; usar base_time como lookback evita falsos negativos.
+        lookback_dias = max(int(np.ceil(base_time)), 3)
+        p_inicio_evento = df.loc[ini, "data"] - timedelta(days=1)
+        p_inicio = min(p_inicio_evento,
+                       df.loc[idx_pico, "data"] - timedelta(days=lookback_dias))
         p_fim = df.loc[idx_pico, "data"]
         chuva_evento = chuva.loc[
             (chuva.index >= p_inicio) & (chuva.index <= p_fim)

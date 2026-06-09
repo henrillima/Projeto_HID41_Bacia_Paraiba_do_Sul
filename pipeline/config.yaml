@@ -53,7 +53,10 @@ fluviometria:
   codigo_bacia: 5                 # 5 = Atlântico, Trecho Leste (contém Paraíba do Sul)
   sub_bacias_pref: ["58", "57"]   # prefixos de código para Paraíba do Sul
   apenas_operando: false
-  data_inicio: "1970-01-01"
+  # Série limpa começa em 1979: 1970-1978 tem platô artificial (cotas
+  # constantes ~10 m³/s gravadas pela ANA na fase de implantação da estação),
+  # gerando eventos com coef. de escoamento > 1 e enviesando AMS/HU.
+  data_inicio: "1979-01-01"
   data_fim: "2025-12-31"
   # Exutório oficial do Projeto 2 = a MESMA estação usada na Parte 1 (Excel):
   # 58142200 — BUQUIRINHA II (Rio Buquira, CABra ID 318, A ≈ 407–410 km²).
