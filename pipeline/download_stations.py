@@ -1,7 +1,12 @@
 """
-Baixa dados pluviométricos de estações da ANA via API SOAP pública.
+[LEGADO] Baixa dados pluviométricos via API SOAP pública da ANA.
 
-API usada: http://telemetriaws1.ana.gov.br/ServiceANA.asmx
+⚠️  A partir do Projeto 2 / Fase 1, o pipeline padrão usa a nova API REST
+    HidroWebService — ver `pipeline_fluvio.py` (fluviometria) e
+    `pipeline.py --via rest` (pluviometria). Este script é mantido apenas
+    como **fallback** para o caso de a API REST ficar fora do ar.
+
+API SOAP usada: http://telemetriaws1.ana.gov.br/ServiceANA.asmx
   - Não requer cadastro nem autenticação
   - O endpoint HidroInventario pode estar instável (500) — use --inventario como alternativa
 

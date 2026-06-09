@@ -45,12 +45,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </p>
               </div>
             </a>
-            <nav className="hidden gap-5 text-sm text-blue-200 sm:flex">
+            <nav className="hidden gap-4 text-sm text-blue-200 sm:flex">
               <a href="/" className="hover:text-white">Início</a>
               <a href="/dashboard" className="hover:text-white">Dashboard</a>
               <a href="/estacoes" className="hover:text-white">Estações</a>
               <a href="/series" className="hover:text-white">Séries</a>
+              <a href="/fluviometria" className="hover:text-white">Fluviometria</a>
+              <a href="/regime" className="hover:text-white">Regime</a>
+              <a href="/eventos" className="hover:text-white">Eventos</a>
+              <a href="/extremos" className="hover:text-white">Extremos</a>
               <a href="/selecao" className="hover:text-white">Seleção</a>
+              <a href="/selecao-fluvio" className="hover:text-white">Exutório</a>
               <a href="/preenchimento" className="hover:text-white">Preenchimento</a>
               <a href="/tabela" className="hover:text-white">Tabela</a>
               <a href="/transparencia" className="hover:text-white">Metodologia</a>

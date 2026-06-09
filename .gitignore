@@ -17,8 +17,12 @@ build/
 
 # Data (nunca commitar os ZIPs brutos nem caches)
 pipeline/data/raw/
+pipeline/data/raw_v2/
 pipeline/data/processed/
 pipeline/*.parquet
+
+# Cache de token e respostas da API REST ANA
+pipeline/.cache/
 
 # Node / Next.js
 node_modules/

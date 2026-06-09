@@ -6,7 +6,9 @@ via UI do dashboard), processa cada estação e salva todos os resultados.
 
 Sequência:
   1. Lê config_estacoes do Supabase (estações com lat/lon configurados)
-  2. Parseia os ZIPs locais de cada estação
+  2. **Fonte dos dados diários** (controlada por --via, default = rest):
+       - `--via rest`: chama HidroSerieChuva via API REST HidroWebService.
+       - `--via local`: lê ZIPs locais em data/raw/ (modo legado).
   3. Aplica preenchimento de falhas (regressão + IDW) em TODAS as estações
   4. Escolhe método vencedor por estação (menor RMSE no holdout)
   5. Constrói séries mensais, anuais e de máx. diária anual
@@ -15,11 +17,13 @@ Sequência:
 
 Uso:
   cd pipeline
-  python pipeline.py
+  python pipeline.py                 # via REST (default; novo padrão)
+  python pipeline.py --via local     # fallback: ZIPs em data/raw/
 """
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import sys
@@ -31,8 +35,10 @@ from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+from src.ana_client import client_from_env
 from src.gap_filling import comparar_metodos, fill_idw, fill_regressao_multipla
 from src.parser import parse_ana_zip
+from src.pluvio_api import fetch_chuva_diaria
 from src.series_builder import build_annual, build_max_daily_annual, build_monthly
 from src.stats import histograma_com_estatisticas
 from src.supabase_loader import (
@@ -78,7 +84,22 @@ def find_zip(codigo: str) -> Path:
     return candidates[0]
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--via", choices=["rest", "local"], default="rest",
+        help="Fonte das séries: 'rest' (HidroWebService) ou 'local' (ZIPs em data/raw/).",
+    )
+    ap.add_argument(
+        "--data-inicio", default=None,
+        help="Data inicial yyyy-MM-dd (REST). Default = config.yaml fluviometria.data_inicio.",
+    )
+    ap.add_argument(
+        "--data-fim", default=None,
+        help="Data final yyyy-MM-dd (REST). Default = config.yaml fluviometria.data_fim.",
+    )
+    args = ap.parse_args(argv)
+
     load_dotenv(Path(__file__).parent / ".env")
 
     url = os.environ.get("SUPABASE_URL")
@@ -131,18 +152,37 @@ def main() -> None:
     logger.info(f"Referência: {codigo_ref}")
     logger.info("=" * 60)
 
-    # Parse dos ZIPs
+    # ---------- Ingestão das séries diárias ----------
     series_diarias: dict[str, pd.DataFrame] = {}
-    for est in estacoes_cfg:
-        codigo = est["codigo"]
-        try:
-            zip_path = find_zip(codigo)
-            _, df_daily = parse_ana_zip(zip_path)
-            series_diarias[codigo] = df_daily
-            logger.info(f"[parse] {codigo}: {len(df_daily)} dias")
-        except Exception as e:
-            logger.error(f"[parse] {codigo}: {e}")
-            sys.exit(1)
+
+    if args.via == "rest":
+        ana_client = client_from_env()
+        fluvio_cfg = cfg_yaml.get("fluviometria", {})
+        ini = args.data_inicio or fluvio_cfg.get("data_inicio", "1970-01-01")
+        fim = args.data_fim or fluvio_cfg.get("data_fim", "2025-12-31")
+        logger.info(f"[via=REST] janela {ini} → {fim}")
+        for est in estacoes_cfg:
+            codigo = est["codigo"]
+            try:
+                _, df_daily = fetch_chuva_diaria(ana_client, codigo, ini, fim)
+                if df_daily.empty:
+                    raise RuntimeError("API retornou 0 registros.")
+                series_diarias[codigo] = df_daily
+                logger.info(f"[fetch] {codigo}: {len(df_daily)} dias (REST)")
+            except Exception as e:
+                logger.error(f"[fetch] {codigo}: {e}")
+                sys.exit(1)
+    else:
+        for est in estacoes_cfg:
+            codigo = est["codigo"]
+            try:
+                zip_path = find_zip(codigo)
+                _, df_daily = parse_ana_zip(zip_path)
+                series_diarias[codigo] = df_daily
+                logger.info(f"[parse] {codigo}: {len(df_daily)} dias (ZIP local)")
+            except Exception as e:
+                logger.error(f"[parse] {codigo}: {e}")
+                sys.exit(1)
 
     # Pivot (index=data, colunas=codigos)
     df_pivot = pd.DataFrame({

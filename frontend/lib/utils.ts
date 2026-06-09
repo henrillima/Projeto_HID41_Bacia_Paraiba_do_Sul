@@ -24,6 +24,23 @@ export function fmtAnoMes(ano: number, mes: number): string {
   return `${String(mes).padStart(2, "0")}/${ano}`;
 }
 
+export function fmtVazao(v: number | null | undefined, decimais = 2): string {
+  if (v == null) return "—";
+  return `${v.toFixed(decimais)} m³/s`;
+}
+
+export function fmtCota(v: number | null | undefined, decimais = 0, unidade: "cm" | "m" = "cm"): string {
+  if (v == null) return "—";
+  if (unidade === "m") return `${(v / 100).toFixed(2)} m`;
+  return `${v.toFixed(decimais)} cm`;
+}
+
+export function fmtArea(km2: number | null | undefined): string {
+  if (km2 == null) return "—";
+  if (km2 >= 1000) return `${(km2 / 1000).toFixed(1)} mil km²`;
+  return `${km2.toFixed(0)} km²`;
+}
+
 /** Computes descriptive statistics from an array of values (nulls counted as failures). */
 export function computeStats(values: (number | null)[]): EstatisticasDescritivas {
   const valid = values.filter((v): v is number => v != null);

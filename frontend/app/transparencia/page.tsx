@@ -319,9 +319,196 @@ export default function TransparenciaPage() {
         )}
       </Secao>
 
-      {/* 6. Nota sobre estações sem dados */}
+      {/* 6. Fluviometria & Curva-Chave (Projeto 2 / Fase 1) */}
+      <Secao numero="6" titulo="Fluviometria & curva-chave">
+        <p className="text-sm text-slate-600">
+          Para a análise quantitativa do regime de vazões e dos eventos extremos
+          (Projeto 2), incorporamos os dados da estação fluviométrica do exutório da bacia.
+          A ingestão é feita pela nova{" "}
+          <strong>API REST HidroWebService</strong> da ANA — token Bearer, TTL 60 min,
+          documentação completa em <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">docs/ANA_REST_API.md</code>.
+        </p>
+        <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+            <p className="text-xs font-semibold uppercase text-blue-700">Endpoints usados</p>
+            <ul className="mt-1 list-disc pl-4 text-blue-800/90">
+              <li>/HidroInventarioEstacoes (descoberta)</li>
+              <li>/HidroSerieVazao (m³/s)</li>
+              <li>/HidroSerieCotas (cm)</li>
+              <li>/HidroSerieResumoDescarga (medições)</li>
+              <li>/HidroSerieCurvaDescarga (ANA oficial)</li>
+            </ul>
+          </div>
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+            <p className="text-xs font-semibold uppercase text-emerald-700">Curva-chave (potência)</p>
+            <p className="mt-1 font-mono text-xs text-emerald-900">Q = a·(h − h₀)<sup>b</sup></p>
+            <p className="mt-1 text-emerald-800/90">
+              Ajuste por LS não-linear (<code>scipy.optimize.curve_fit</code>) com h₀ estimado por
+              grid-search; resíduos validados por Kolmogorov-Smirnov.
+            </p>
+          </div>
+          <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
+            <p className="text-xs font-semibold uppercase text-amber-700">Seleção do exutório</p>
+            <p className="mt-1 text-amber-900/90">
+              Ranking por score composto{" "}
+              <span className="font-mono text-xs">
+                0.5·anos + 0.3·(1−falhas) + 0.2·proximidade
+              </span>
+              ; top-5 apresentadas em <a href="/selecao-fluvio" className="underline">/selecao-fluvio</a>.
+            </p>
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          A migração para a API REST também passa a alimentar as séries pluviométricas
+          (<code className="rounded bg-slate-100 px-1 py-0.5">python pipeline.py --via rest</code>),
+          eliminando a necessidade de ZIPs baixados manualmente.
+        </p>
+      </Secao>
+
+      {/* 7. Regime de vazões — Fase 2 */}
+      <Secao numero="7" titulo="Regime de vazões — permanência, Eckhardt e Q7,10">
+        <p className="text-sm text-slate-600">
+          Caracterização do regime fluvial da bacia segundo as três análises padrão
+          de hidrologia quantitativa (referência: HID41_Projeto2_Metodologia, etapas 1,
+          2 e 6; Collischonn & Dornelles cap. 15).
+        </p>
+        <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+            <p className="text-xs font-semibold uppercase text-blue-700">Curva de permanência</p>
+            <p className="mt-1 font-mono text-xs text-blue-900">P(%) = m/(n+1) · 100</p>
+            <p className="mt-1 text-blue-800/90">
+              Ordenação decrescente + plotagem de Weibull, com Q5 a Q99 interpolados.
+              Q90 é a vazão de outorga; Q50 a mediana; Q10 vazões altas frequentes.
+            </p>
+          </div>
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+            <p className="text-xs font-semibold uppercase text-emerald-700">
+              Filtro de Eckhardt (2005)
+            </p>
+            <p className="mt-1 font-mono text-xs text-emerald-900">
+              b<sub>i</sub> = ((1−BFI<sub>max</sub>)·α·b<sub>i−1</sub> +
+              (1−α)·BFI<sub>max</sub>·y<sub>i</sub>) / (1−α·BFI<sub>max</sub>)
+            </p>
+            <p className="mt-1 text-emerald-800/90">
+              BFI<sub>max</sub> = 0.80 (aquífero poroso, padrão para PdS cabeceira); α
+              estimado por regressão log-linear na mediana das recessões.
+            </p>
+          </div>
+          <div className="rounded-lg border border-violet-100 bg-violet-50 p-3">
+            <p className="text-xs font-semibold uppercase text-violet-700">
+              Q7,10 — vazão mínima ecológica
+            </p>
+            <p className="mt-1 text-violet-900/90">
+              Média móvel de 7 dias → mínimo anual (out → set) → Log-Pearson III por
+              método dos momentos em log(Q). Q7,10 = quantil de não-excedência 10%
+              (TR = 10 anos para mínimos).
+            </p>
+          </div>
+        </div>
+      </Secao>
+
+      {/* 8. Eventos e Hidrogramas Unitários — Fase 3 */}
+      <Secao numero="8" titulo="Eventos chuva-vazão e hidrogramas unitários">
+        <p className="text-sm text-slate-600">
+          Identificação de eventos isolados e construção dos hidrogramas
+          unitários observado e SCS (referência: HID41_Projeto2_Metodologia,
+          etapas 3, 4 e 5; Collischonn & Dornelles cap. 18).
+        </p>
+        <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+            <p className="text-xs font-semibold uppercase text-blue-700">Isolamento</p>
+            <p className="mt-1 text-blue-800/90">
+              <code>scipy.signal.find_peaks</code> com proeminência mínima
+              relativa a Q95 e distância entre picos ≥ 5 dias; recuo até o
+              último mínimo local; término por base-time SCS{" "}
+              <span className="font-mono">D = 0,827·A<sup>0,2</sup></span> dias.
+              Base separada por reta linear entre extremos.
+            </p>
+          </div>
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+            <p className="text-xs font-semibold uppercase text-emerald-700">HU observado</p>
+            <p className="mt-1 font-mono text-xs text-emerald-900">
+              u<sub>i</sub> = Q<sub>direto,i</sub> / h<sub>mm</sub>
+            </p>
+            <p className="mt-1 text-emerald-800/90">
+              Lâmina <span className="font-mono">h = V / A</span> em mm sobre a
+              bacia (V em m³, A em km²; 1 mm·km² = 1.000 m³). HU médio = média
+              das ordenadas alinhadas pelo pico.
+            </p>
+          </div>
+          <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
+            <p className="text-xs font-semibold uppercase text-amber-700">HU SCS triangular</p>
+            <p className="mt-1 font-mono text-xs text-amber-900">
+              tp = 0,6·tc · Tp = tp + d/2 · Qp = 0,208·A/Tp · tb = 2,67·Tp
+            </p>
+            <p className="mt-1 text-amber-800/90">
+              tc por Kirpich (bacias pequenas) ou Watt&Chow (até ≈ 5.840 km²).
+              Comparação obs × SCS via Nash-Sutcliffe, erro relativo no pico e
+              erro no tempo de pico.
+            </p>
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          Parâmetros físicos da bacia (A, L, Δh, CN) ficam em{" "}
+          <code className="rounded bg-slate-100 px-1">config.yaml → bacia</code>.
+          Fase 3 é pulada se A_km² estiver vazio.
+        </p>
+      </Secao>
+
+      {/* 9. Eventos extremos — Fase 4 */}
+      <Secao numero="9" titulo="Eventos extremos — frequência, IDF e chuva de projeto">
+        <p className="text-sm text-slate-600">
+          Análise de frequência das vazões máximas anuais, curvas IDF regionais
+          e chuva de projeto pelo método dos blocos alternados (referência:
+          HID41_Projeto2_Metodologia, etapas 8, 9 e 10).
+        </p>
+        <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+          <div className="rounded-lg border border-violet-100 bg-violet-50 p-3">
+            <p className="text-xs font-semibold uppercase text-violet-700">
+              Frequência de cheias
+            </p>
+            <p className="mt-1 text-violet-900/90">
+              Ajuste de 5 distribuições candidatas (Gumbel, GEV, LogNormal,
+              Pearson III, Log-Pearson III); seleção por <strong>AIC</strong>
+              com KS p-value como filtro de aderência. Quantis Q(TR) com IC 90%
+              via bootstrap paramétrico (1.000 reamostras).
+            </p>
+          </div>
+          <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
+            <p className="text-xs font-semibold uppercase text-amber-700">IDF regional</p>
+            <p className="mt-1 font-mono text-xs text-amber-900">
+              i = a · TR^b / (t<sub>d</sub> + c)^d
+            </p>
+            <p className="mt-1 text-amber-800/90">
+              Equação pré-publicada (Pfafstetter / DNOS para SJC adotado como
+              default; configurável em <code>config.yaml → idf.parametros</code>).
+              Plotada para TR ∈ &#123;2, 5, 10, 25, 50, 100, 500, 1000&#125;.
+            </p>
+          </div>
+          <div className="rounded-lg border border-red-100 bg-red-50 p-3">
+            <p className="text-xs font-semibold uppercase text-red-700">
+              Chuva de projeto (blocos alternados)
+            </p>
+            <p className="mt-1 text-red-900/90">
+              Para TR = 10 e TR = 100 anos: discretização Δt; intensidade pela
+              IDF em cada t<sub>k</sub>; ΔP<sub>k</sub> = P<sub>k</sub> −
+              P<sub>k−1</sub>; reorganização com maior bloco no centro (padrão
+              intermediário). Padrões adiantado e atrasado disponíveis para
+              sensibilidade.
+            </p>
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          Acoplamento opcional Fase 3 ↔ Fase 4: convoluir a chuva de projeto
+          com o HU SCS gera o <em>hidrograma de projeto</em>, que pode ser
+          comparado com Q(TR) da análise de frequência para validar coerência
+          entre os dois caminhos.
+        </p>
+      </Secao>
+
+      {/* 10. Nota sobre estações sem dados */}
       {!ldSD && semDados.length > 0 && (
-        <Secao numero="6" titulo="Estações sem dados disponíveis">
+        <Secao numero="10" titulo="Estações sem dados disponíveis">
           <p className="text-sm text-slate-600">
             Das {candidatas.length + semDados.length} estações no inventário baixado,{" "}
             <strong>{semDados.length}</strong> retornaram arquivos ZIP vazios — existem
@@ -563,6 +750,97 @@ export default function TransparenciaPage() {
               os dados anteriores antes de cada carga (DELETE CASCADE seguido de
               upsert), garantindo que re-execuções corrijam dados sem acumular
               registros duplicados ou inconsistentes.
+            </DefBox>
+          </div>
+        </div>
+
+        {/* Termos fluviométricos — Projeto 2 / Fase 1 */}
+        <div className="mb-4">
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">
+            Fluviometria e curva-chave
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <DefBox termo="Cota" sigla="h" cor="emerald">
+              Altura da lâmina d'água em uma seção de rio em relação a um zero
+              local da estação fluviométrica (régua linimétrica). Reportada em
+              centímetros pela ANA. A cota é medida diretamente; a vazão é
+              derivada da cota via curva-chave.
+            </DefBox>
+
+            <DefBox termo="Vazão" sigla="Q" cor="emerald">
+              Volume de água que atravessa uma seção do rio por unidade de tempo,
+              em m³/s. Obtida por medições diretas (molinete, ADCP) ou
+              indiretamente pela curva-chave aplicada à cota.
+            </DefBox>
+
+            <DefBox
+              termo="Curva-chave"
+              sigla="Q(h)"
+              formula="Q = a · (h − h₀)^b"
+              cor="emerald"
+            >
+              Relação biunívoca entre cota e vazão em uma seção. Ajustada por
+              regressão não-linear sobre pares (h, Q) medidos em campo. Forma de
+              potência captura a hidráulica de canais aluviais até a cota de
+              transbordamento; acima disso pode-se precisar segmentar a curva.
+            </DefBox>
+
+            <DefBox termo="Cota zero da escala" sigla="h₀" cor="emerald">
+              Altura da lâmina d'água a partir da qual a vazão na seção é
+              detectável (Q ≥ 0). É um parâmetro físico do ajuste — pode ser
+              negativa se o zero da régua estiver acima do leito. Aqui é
+              estimada por grid-search minimizando o SSR do ajuste log-linear.
+            </DefBox>
+
+            <DefBox termo="Estação exutória" cor="emerald">
+              Estação fluviométrica posicionada no ponto mais a jusante da bacia
+              de estudo — onde toda a água superficial da bacia converge antes
+              de sair. Define a área de drenagem efetiva da análise. Neste
+              estudo, o exutório é a estação{" "}
+              <span className="font-mono">58142200 (BUQUIRINHA II)</span>, no
+              Rio Buquira (afluente do Paraíba do Sul), área ≈ 410 km².
+            </DefBox>
+
+            <DefBox termo="Medições de descarga líquida" cor="emerald">
+              Medições pontuais de vazão em campo (molinete, ADCP), com data,
+              cota correspondente, área molhada, velocidade média, largura e
+              profundidade da seção. São a matéria-prima para ajustar a curva-chave.
+              Vêm do endpoint <code>/HidroSerieResumoDescarga/v1</code>.
+            </DefBox>
+
+            <DefBox termo="Bearer token (OAuth)" cor="amber">
+              Mecanismo de autenticação da nova API REST da ANA: um login
+              (CPF + senha) retorna um <em>tokenautenticacao</em> com validade
+              de 60 minutos, que deve acompanhar cada chamada subsequente no
+              header <code>Authorization: Bearer …</code>. O cliente Python
+              cacheia o token em <code>pipeline/.cache/</code> e renova
+              automaticamente em 401.
+            </DefBox>
+
+            <DefBox
+              termo="Kolmogorov-Smirnov"
+              sigla="KS"
+              formula="D = sup |F̂(x) − F₀(x)|"
+              cor="blue"
+            >
+              Teste não-paramétrico que compara a distribuição empírica dos
+              resíduos (normalizados) com uma distribuição teórica de referência.
+              Reportamos o <em>p-value</em> do KS para validar a normalidade dos
+              resíduos da curva-chave — se p {'<'} 0,05, a forma simples por
+              potência pode ser inadequada e devemos considerar segmentação.
+            </DefBox>
+
+            <DefBox
+              termo="Sub-bacia / Macrorregião hidrográfica"
+              cor="amber"
+            >
+              A ANA divide o território em 9 macrorregiões hidrográficas
+              (códigos 1–9). A bacia do Paraíba do Sul pertence à macrorregião{" "}
+              <strong>5 (Atlântico, Trecho Leste)</strong>; suas estações
+              fluviométricas usam prefixo <span className="font-mono">58</span>{" "}
+              no código de 8 dígitos. Os pluviômetros do projeto têm prefixos
+              <span className="font-mono">22/23</span> (sub-bacias menores na
+              mesma macro).
             </DefBox>
           </div>
         </div>

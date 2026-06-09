@@ -33,3 +33,131 @@ processamento:
   random_state: 42
   idw_expoente: 2
   supabase_batch_size: 500
+
+# ---------------------------------------------------------------------------
+# API HidroWebService (REST) — Fase 1 do Projeto 2
+# Credenciais ficam em pipeline/.env (ANA_API_USER, ANA_API_PASS).
+# ---------------------------------------------------------------------------
+ana_api:
+  base_url: https://www.ana.gov.br/hidrowebservice
+  token_ttl_s: 3300       # 55 min (TTL real ANA = 60 min; margem de segurança)
+  rate_limit_rps: 2.0     # 2 requisições/segundo para evitar bloqueio de IP
+  retries: 4              # número máximo de tentativas em 429/5xx
+  request_timeout_s: 90.0 # alguns endpoints podem demorar > 30 s
+
+# ---------------------------------------------------------------------------
+# Fluviometria — Projeto 2 / Fase 1
+# ---------------------------------------------------------------------------
+fluviometria:
+  ufs: ["SP", "RJ", "MG"]         # bacia Paraíba do Sul cruza 3 estados
+  codigo_bacia: 5                 # 5 = Atlântico, Trecho Leste (contém Paraíba do Sul)
+  sub_bacias_pref: ["58", "57"]   # prefixos de código para Paraíba do Sul
+  apenas_operando: false
+  data_inicio: "1970-01-01"
+  data_fim: "2025-12-31"
+  # Exutório oficial do Projeto 2 = a MESMA estação usada na Parte 1 (Excel):
+  # 58142200 — BUQUIRINHA II (Rio Buquira, CABra ID 318, A ≈ 407–410 km²).
+  # O pipeline usa este código em vez do top-1 automático (Pindamonhangaba).
+  exutorio_codigo: "58142200"
+  rating_curve:
+    forma: potencia        # potencia | segmentada (futuro)
+    h0_step_cm: 5
+    h0_min_cm: 0
+    min_pontos_ajuste: 6
+  ranking:
+    peso_anos: 0.5
+    peso_falhas: 0.3
+    peso_proximidade: 0.2
+    anos_referencia: 40
+    raio_referencia_km: 20
+
+# ---------------------------------------------------------------------------
+# Regime de vazões — Projeto 2 / Fase 2
+# ---------------------------------------------------------------------------
+regime:
+  permanencia:
+    metodo_plotting: weibull
+    passo_pct: 0.5
+    quantis_alvo: [1, 5, 10, 25, 50, 75, 90, 95, 99]
+  eckhardt:
+    # BFI_max segue Eckhardt (2005). Aquífero poroso típico (cabeceira PdS).
+    bfi_max_default: 0.80
+    alpha_default: 0.98     # usado se a estimativa por recessão falhar
+    estimar_parametros: true
+  q7_10:
+    distribuicao: log_pearson3
+    ano_hidrologico_inicio_mes: 10   # outubro → setembro (padrão SE Brasil)
+    janela_dias: 7
+    prob_nao_excedencia: 0.10
+
+# ---------------------------------------------------------------------------
+# Bacia — parâmetros físicos do EXUTÓRIO do Projeto 2: estação fluviométrica
+# 58142200 — BUQUIRINHA II, no Rio Buquira (afluente do Paraíba do Sul, SP),
+# A ≈ 407–410 km². É a MESMA bacia da Parte 1 (Excel), identificada no dataset
+# CABra (Catchment Attributes for Brazil) como catchment ID 318.
+# >>> Preencher L, Δh/S e CN com os atributos do CABra para o catchment 318
+#     (não precisa redelinear no QGIS). Ver docs/REVISAO_METODOLOGICA.md.
+# ---------------------------------------------------------------------------
+bacia:
+  # Valores do CABra (catchment 318 / ANA 58142200). Ver docs/DADOS_BACIA_BUQUIRA.md.
+  # L foi medido na rede CABra_drainage (script ../Projeto 2/medir_L_qgis.py).
+  area_km2: 410.076               # CABra catch_area (ANA: 407). Oficial.
+  comprimento_talvegue_km: 42.1   # MEDIDO na rede CABra_drainage recortada à bacia
+                                  # 318 (caminho de fluxo mais longo até o exutório,
+                                  # via medir_L_qgis.py em ../Projeto 2). Coerente com
+                                  # a estimativa Hack/distância (~47 km).
+  delta_h_m: 1163                 # CABra: elev_max(1725,54) − elev_gauge(562,81).
+  declividade_media: null         # calcula de Δh/L ≈ 2,76% (canal). NÃO confundir com
+                                  # catch_slope=23,99% do CABra, que é declive de TERRENO.
+  cn_amc2: 60                     # AMC-II. CABra: 70% floresta, 21% pasto, 7% arbustivo
+                                  # sobre Latossolo/Ferralsol profundo (grupo hidrológico
+                                  # B). NRCS/TR-55 → CN≈56–62; adotado 60. (Se solo for
+                                  # grupo A, CN≈33 — sensível; ver doc.)
+  tc_metodo: kirpich              # kirpich | watt_chow. Divergem muito aqui (Kirpich
+                                  # ~5,4 h × W&Chow ~11,6 h); comparar com Tp do HU
+                                  # observado para escolher.
+
+# ---------------------------------------------------------------------------
+# Isolamento de eventos — Projeto 2 / Fase 3
+# ---------------------------------------------------------------------------
+eventos:
+  prominencia_pico_quantil: 0.95     # base do threshold de prominência (×0.3)
+  distancia_min_picos_dias: 5
+  p_min_evento_mm: 10.0              # média de chuva da bacia (mm). 10 = inclusivo.
+  duracao_max_dias: null             # null → automático (base-time SCS + 2 d)
+  chuva_efetiva_metodo: phi_index    # phi_index | scs_cn
+  huo_scs:
+    dt_min: 60                       # passo do HU SCS (min)
+
+# ---------------------------------------------------------------------------
+# Análise de frequência de cheias — Projeto 2 / Fase 4
+# ---------------------------------------------------------------------------
+frequencia:
+  distribuicoes: [gumbel, gev, lognormal, p3, lp3]
+  criterio_selecao: aic              # aic | bic | ks
+  trs: [2, 5, 10, 25, 50, 100, 500, 1000]
+  bootstrap_n: 1000
+  ic_nivel: 0.90
+
+# ---------------------------------------------------------------------------
+# IDF — equação regional pré-publicada (substitua pela fonte confirmada)
+# ---------------------------------------------------------------------------
+idf:
+  regiao: sjc-paraiba-do-sul
+  equacao: pfafstetter
+  fonte: "Pfafstetter / DNOS — São José dos Campos (placeholder; confirmar)"
+  parametros:
+    a: 1239.7
+    b: 0.181
+    c: 22.0
+    d: 0.890
+  duracoes_min: [5, 10, 15, 30, 60, 120, 360, 720, 1440]
+
+# ---------------------------------------------------------------------------
+# Chuva de projeto (blocos alternados)
+# ---------------------------------------------------------------------------
+chuva_projeto:
+  trs_projeto: [10, 100]
+  duracao_total_min: 360
+  dt_min: 10
+  padrao: intermediario              # intermediario | adiantado | atrasado
