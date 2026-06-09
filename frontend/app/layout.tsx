@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Image from "next/image";
+import Link from "next/link";
+import { HeaderNav } from "@/components/HeaderNav";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "HID-41 — Análise Pluviométrica · Paraíba do Sul",
+  title: "HID-41 — Análise Hidrológica · Paraíba do Sul",
   description:
-    "Dashboard de análise de séries históricas de precipitação da bacia do Paraíba do Sul. " +
-    "Disciplina HID-41 — ITA. Dados: ANA Hidroweb.",
+    "Dashboard de análise hidrológica da bacia do Paraíba do Sul: séries pluviométricas e " +
+    "fluviométricas, regime, eventos, extremos e curvas IDF. Disciplina HID-41 — ITA. " +
+    "Dados: ANA Hidroweb.",
   icons: { icon: "/logo-ita-fundo-branco.jpg" },
 };
 
@@ -26,9 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={inter.className}>
         {/* Barra superior de identidade ITA */}
-        <header className="border-b bg-[#00205B] text-white">
+        <header className="relative border-b bg-[#00205B] text-white">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-            <a href="/" className="flex items-center gap-3 hover:opacity-90">
+            <Link href="/" className="flex items-center gap-3 hover:opacity-90">
               <div className="rounded-lg bg-white p-0.5">
                 <Image
                   src="/logo-ita-fundo-branco.jpg"
@@ -44,22 +47,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   Bacia do Paraíba do Sul — URGHI 2
                 </p>
               </div>
-            </a>
-            <nav className="hidden gap-4 text-sm text-blue-200 sm:flex">
-              <a href="/" className="hover:text-white">Início</a>
-              <a href="/dashboard" className="hover:text-white">Dashboard</a>
-              <a href="/estacoes" className="hover:text-white">Estações</a>
-              <a href="/series" className="hover:text-white">Séries</a>
-              <a href="/fluviometria" className="hover:text-white">Fluviometria</a>
-              <a href="/regime" className="hover:text-white">Regime</a>
-              <a href="/eventos" className="hover:text-white">Eventos</a>
-              <a href="/extremos" className="hover:text-white">Extremos</a>
-              <a href="/selecao" className="hover:text-white">Seleção</a>
-              <a href="/selecao-fluvio" className="hover:text-white">Exutório</a>
-              <a href="/preenchimento" className="hover:text-white">Preenchimento</a>
-              <a href="/tabela" className="hover:text-white">Tabela</a>
-              <a href="/transparencia" className="hover:text-white">Metodologia</a>
-            </nav>
+            </Link>
+            <HeaderNav />
           </div>
         </header>
 

@@ -34,11 +34,18 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* Hero */}
       <section>
-        <h1 className="text-2xl font-bold text-slate-800">
-          Análise Pluviométrica — Bacia do Paraíba do Sul
+        <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">
+          Análise Pluviométrica
+        </p>
+        <h1 className="mt-1 text-2xl font-bold text-slate-800">
+          Dashboard — Bacia do Paraíba do Sul
         </h1>
         <p className="mt-1 text-slate-500">
           Séries históricas diárias, mensais e anuais · Preenchimento de falhas por regressão e IDW
+          {" · "}
+          <a href="/fluviometria" className="text-blue-600 hover:underline">
+            ver análise fluviométrica →
+          </a>
         </p>
       </section>
 
