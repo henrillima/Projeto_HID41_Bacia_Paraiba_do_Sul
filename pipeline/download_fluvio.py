@@ -36,6 +36,8 @@ from rich.table import Table
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import os  # noqa: E402
+
 from src.ana_client import HidroWebError, client_from_env  # noqa: E402
 from src.fluvio_discover import descobrir_fluvio, rankear_candidatas  # noqa: E402
 from src.fluvio_parser import (  # noqa: E402
@@ -44,6 +46,7 @@ from src.fluvio_parser import (  # noqa: E402
     parse_serie_cotas,
     parse_serie_vazao,
 )
+from src.supabase_loader import get_client, insert_candidatas_fluvio  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -119,6 +122,18 @@ def cmd_discover(args: argparse.Namespace) -> None:
     out_csv = ROOT / "data" / "fluvio_candidatas.csv"
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_csv, index=False, encoding="utf-8")
+
+    # Persiste ranking no Supabase para o BI (/selecao-fluvio).
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_KEY")
+    if url and key:
+        try:
+            client_supa = get_client(url, key)
+            insert_candidatas_fluvio(client_supa, df)
+        except Exception as exc:
+            logger.warning(f"falha ao persistir candidatas no Supabase: {exc}")
+    else:
+        logger.warning("SUPABASE_URL/SERVICE_KEY ausentes — ranking apenas em CSV.")
 
     # Apresenta top-N
     n = args.top
