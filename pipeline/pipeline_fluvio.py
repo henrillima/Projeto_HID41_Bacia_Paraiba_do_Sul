@@ -712,6 +712,34 @@ def _carregar_chuva_media_bacia(client_supa) -> pd.Series:
     return media.sort_index()
 
 
+def _purgar_outras_estacoes(client_supa, codigos_validos: list[str]) -> None:
+    """Remove de `estacoes_fluvio` qualquer estação que não esteja em
+    `codigos_validos`. As tabelas filhas (fluviometria_*, eventos,
+    HU, frequencia, etc.) são limpas automaticamente por CASCADE.
+
+    Garante idempotência: o BI sempre reflete apenas as estações do run atual.
+    Para manter estações antigas (ex.: comparação Pindamonhangaba × Buquirinha),
+    passe ambos os códigos em --codigos.
+    """
+    try:
+        rows = client_supa.table("estacoes_fluvio").select("codigo").execute().data
+    except Exception as exc:
+        logger.warning(f"  [purga] falha ao listar estacoes_fluvio: {exc}")
+        return
+    existentes = {str(r["codigo"]) for r in rows if r.get("codigo")}
+    validos = {str(c) for c in codigos_validos}
+    a_remover = existentes - validos
+    if not a_remover:
+        logger.info(f"  [purga] 0 estações residuais (banco já reflete o run atual).")
+        return
+    logger.info(f"  [purga] removendo {len(a_remover)} estação(ões) residual(is): {sorted(a_remover)}")
+    for cod in sorted(a_remover):
+        try:
+            limpar_estacao_fluvio(client_supa, cod)
+        except Exception as exc:
+            logger.warning(f"  [purga] falha ao remover {cod}: {exc}")
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--codigos", nargs="*", default=None,
@@ -743,6 +771,11 @@ def main(argv: list[str] | None = None) -> None:
             "Rode `python download_fluvio.py discover` ou passe --codigos."
         )
         sys.exit(1)
+
+    # Purga estações residuais: mantém apenas as do run atual em estacoes_fluvio.
+    # Cascade limpa tabelas filhas (fluviometria_*, eventos, HU, frequencia, etc.).
+    codigos_validos = [str(e.get("codigo")) for e in estacoes if e.get("codigo")]
+    _purgar_outras_estacoes(client_supa, codigos_validos)
 
     for est in estacoes:
         try:

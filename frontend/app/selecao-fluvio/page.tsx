@@ -5,17 +5,23 @@ import { Search, Target, Check, Terminal } from "lucide-react";
 import Link from "next/link";
 
 import { useCandidatasFluvio, useConfigFluvio } from "@/hooks/useCandidatasFluvio";
+import { useEstacoesFluvio } from "@/hooks/useEstacoesFluvio";
 import { KPICard } from "@/components/KPICard";
 import { fmtArea } from "@/lib/utils";
 
 export default function SelecaoFluvioPage() {
   const { data: candidatas, loading } = useCandidatasFluvio();
   const { data: config, saving, marcarOutlet, error } = useConfigFluvio();
+  const { data: estacoesFluvio } = useEstacoesFluvio();
 
   const [filtro, setFiltro] = useState("");
   const [minAnos, setMinAnos] = useState(0);
 
-  const outletAtual = config.find((c) => c.is_outlet)?.codigo;
+  // Outlet pode estar em config_estacoes_fluvio (marcado via UI) OU em
+  // estacoes_fluvio (fixado por config.yaml e processado pelo pipeline).
+  const outletAtual =
+    config.find((c) => c.is_outlet)?.codigo
+    ?? estacoesFluvio.find((e) => e.is_outlet)?.codigo;
 
   const filtradas = useMemo(() => {
     const f = filtro.trim().toLowerCase();

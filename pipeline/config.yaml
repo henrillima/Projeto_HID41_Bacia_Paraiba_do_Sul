@@ -161,6 +161,14 @@ frequencia:
 # Validade declarada: TR ≤ 20 anos, t ≤ 360 min (6 h).
 # Para TR=100 (chuva_projeto), há extrapolação. Documentar essa limitação
 # no relatório — a forma é estável mas o IC se alarga muito além de TR=20.
+#
+# LIMITAÇÃO orográfica: SJC fica no vale (~580 m), mas a bacia do Buquira
+# é serrana (cabeceiras a ~1 700 m). Pela Mantiqueira, espera-se que
+# intensidades reais nas cabeceiras sejam 10-30% maiores que o previsto
+# por esta IDF. A chuva de projeto TR=100 deve ser interpretada como
+# LIMITE INFERIOR das intensidades reais. Ver seção 8.5 do
+# docs/RELATORIO_METODOLOGIA.md para detalhes e pendências futuras
+# (transposição altimétrica, IDF dos pluvios P2 via desagregação).
 # ---------------------------------------------------------------------------
 idf:
   regiao: sjc-paraiba-do-sul

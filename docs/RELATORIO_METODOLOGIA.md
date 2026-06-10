@@ -562,6 +562,48 @@ $t \le 360$ min (6 h). Para a chuva de projeto **TR = 100**, há
 extrapolação — a forma Pfafstetter é estável, mas o intervalo de
 confiança real é largo (discutir como limitação no relatório).
 
+#### Limitação: aplicação do IDF de SJC a uma bacia serrana
+
+O IDF Ferreira & Waltz (2001) é calibrado para postos pluviográficos de
+**São José dos Campos (~580 m de altitude)** — praticamente na foz do
+Rio Buquira no Paraíba do Sul. A bacia do Buquira, porém, é
+**serrana**: cabeceiras na Serra da Mantiqueira a ~1 700 m, gradiente
+vertical Δz = 1 163 m em apenas 42 km de talvegue.
+
+Pela influência **orográfica** da Mantiqueira (forçamento ascendente
+do ar úmido pelo escarpamento sul), espera-se que as intensidades
+reais nas cabeceiras sejam **10-30% superiores** ao previsto pelo IDF
+do vale (literatura de transposição altimétrica: Bertoni & Tucci,
+*Hidrologia: Ciência e Aplicação*, 2007; e estudos regionais da bacia
+do Paraíba do Sul, e.g. CETESB-DAEE).
+
+**Implicações práticas:**
+
+- O uso do IDF de SJC é **defensável para projeto de disciplina** (é a
+  fonte oficial mais próxima, validada contra a tabela publicada e
+  representativa da foz da bacia).
+- A chuva de projeto **TR = 100** deve ser interpretada como **limite
+  inferior** das intensidades reais nas cabeceiras — a chuva real de
+  projeto em pontos como Monteiro Lobato (cabeceiras a 800 m) pode ser
+  ~10-20% maior que a estimada.
+- O dimensionamento de obras de drenagem na bacia deveria aplicar um
+  **fator de segurança orográfico** sobre os volumes calculados, ou
+  refazer a análise via transposição altimétrica.
+
+**Pendências metodológicas** (para evolução futura do trabalho):
+
+1. **Transposição altimétrica**: aplicar fator de correção do tipo
+   $i_{\text{bacia}} = i_{SJC} \cdot (1 + k \cdot \Delta z / 100)$, com
+   $k$ estimado de literatura regional e $\Delta z$ = cota média da
+   sub-bacia menos cota SJC.
+2. **IDF dos pluviômetros P2 via desagregação**: construir IDF
+   próprio a partir das séries diárias máximas anuais de Monteiro
+   Lobato + Santa Branca + UHE Santa Branca, aplicando coeficientes
+   CETESB ou Pfafstetter para desagregar a chuva diária em
+   sub-diárias. Mais defensável cientificamente, mas requer
+   pluviógrafo ou método de desagregação validado para a região
+   serrana.
+
 ![F13 — Curvas IDF para vários TR](figuras/F13_idf.png)
 
 ### 8.6 Chuva de projeto — método dos blocos alternados
