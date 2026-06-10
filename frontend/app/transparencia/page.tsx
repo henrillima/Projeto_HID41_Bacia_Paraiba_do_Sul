@@ -90,39 +90,46 @@ export default function TransparenciaPage() {
       <Secao numero="1" titulo="Coleta dos dados brutos">
         <div className="grid gap-4 text-sm sm:grid-cols-3">
           <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase text-slate-400">Fonte</p>
-            <p className="mt-1 font-medium text-slate-700">ANA Hidroweb</p>
-            <p className="text-xs text-slate-500">Séries históricas diárias de precipitação pluviométrica</p>
-          </div>
-          <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase text-slate-400">Inventário baixado</p>
-            <p className="mt-1 font-medium text-slate-700">
-              {ldSD ? "—" : candidatas.length + semDados.length} estações
-            </p>
-            <p className="text-xs text-slate-500">Estado de São Paulo · Tipo pluviométrica</p>
-          </div>
-          <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase text-slate-400">Com dados</p>
-            <p className="mt-1 font-medium text-slate-700">{candidatas.length} estações</p>
+            <p className="text-xs font-semibold uppercase text-slate-400">Fonte primária</p>
+            <p className="mt-1 font-medium text-slate-700">ANA HidroWebService REST</p>
             <p className="text-xs text-slate-500">
-              {ldSD ? "—" : semDados.length} sem dados disponíveis na fonte
+              Bearer token JWT, TTL 60 min, rate limit 2 RPS, retry automático.
+              Caminho legado (ZIPs do SNIRH) mantido como fallback.
+            </p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-400">Pluviômetros do Projeto 1</p>
+            <p className="mt-1 font-medium text-slate-700">3 estações fixas</p>
+            <p className="text-xs text-slate-500">
+              Pindamonhangaba (2245048, referência), Estrada do Cunha (2245055)
+              e São Luís do Paraitinga (2345065).
+            </p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-400">Inventário diagnóstico</p>
+            <p className="mt-1 font-medium text-slate-700">
+              {ldSD ? "—" : candidatas.length + semDados.length} estações de SP
+            </p>
+            <p className="text-xs text-slate-500">
+              {ldSD ? "—" : semDados.length} sem dados na fonte (registradas para auditoria).
             </p>
           </div>
         </div>
 
         <div className="mt-4 text-sm text-slate-600">
-          <p className="font-medium text-slate-700">Formato dos arquivos</p>
+          <p className="font-medium text-slate-700">Endpoints e consistência</p>
           <p className="mt-1">
-            Cada estação é entregue em um arquivo ZIP contendo um CSV com encoding
-            latin-1 e separador ponto-e-vírgula. Cada linha representa um mês, com
-            as colunas <code className="rounded bg-slate-100 px-1">Chuva01</code>–
-            <code className="rounded bg-slate-100 px-1">Chuva31</code> para os valores
-            diários. Dias inexistentes (ex.: 30 e 31 de fevereiro) resultam em colunas
-            automaticamente descartadas pelo parser.
+            Séries são obtidas via <code className="rounded bg-slate-100 px-1">HidroSerieChuva/v1</code>,
+            <code className="rounded bg-slate-100 px-1 ml-1">HidroSerieVazao/v1</code>,
+            <code className="rounded bg-slate-100 px-1 ml-1">HidroSerieCotas/v1</code> e
+            <code className="rounded bg-slate-100 px-1 ml-1">HidroSerieResumoDescarga/v1</code>.
+            Cada dia retorna com <code className="rounded bg-slate-100 px-1">Nivel_Consistencia</code>
+            ∈ {`{1 (bruto), 2 (consistido)}`}.
           </p>
           <p className="mt-2">
-            Quando um mesmo mês aparece com nível de consistência 1 (bruto) e 2 (consistido),
-            mantém-se apenas o nível 2. Valores negativos são convertidos para ausência de dado.
+            Quando o mesmo dia aparece com ambos os níveis, mantém-se apenas o
+            nível 2 (revisado pela ANA). Valores negativos são convertidos para
+            ausência de dado (NaN).
           </p>
         </div>
       </Secao>
@@ -322,47 +329,102 @@ export default function TransparenciaPage() {
       {/* 6. Fluviometria & Curva-Chave (Projeto 2 / Fase 1) */}
       <Secao numero="6" titulo="Fluviometria & curva-chave">
         <p className="text-sm text-slate-600">
-          Para a análise quantitativa do regime de vazões e dos eventos extremos
-          (Projeto 2), incorporamos os dados da estação fluviométrica do exutório da bacia.
-          A ingestão é feita pela nova{" "}
-          <strong>API REST HidroWebService</strong> da ANA — token Bearer, TTL 60 min,
-          documentação completa em <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">docs/ANA_REST_API.md</code>.
+          O exutório oficial do Projeto 2 é a estação fluviométrica
+          {" "}<strong>58142200 — Buquirinha II</strong> (operadora SGB-CPRM),
+          no Rio Buquira, afluente do Paraíba do Sul. A estação é fixada em
+          {" "}<code className="rounded bg-slate-100 px-1 text-xs">pipeline/config.yaml → fluviometria.exutorio_codigo</code>
+          {" "}e processada via API REST HidroWebService da ANA.
         </p>
         <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
           <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
-            <p className="text-xs font-semibold uppercase text-blue-700">Endpoints usados</p>
-            <ul className="mt-1 list-disc pl-4 text-blue-800/90">
-              <li>/HidroInventarioEstacoes (descoberta)</li>
-              <li>/HidroSerieVazao (m³/s)</li>
-              <li>/HidroSerieCotas (cm)</li>
-              <li>/HidroSerieResumoDescarga (medições)</li>
-              <li>/HidroSerieCurvaDescarga (ANA oficial)</li>
-            </ul>
+            <p className="text-xs font-semibold uppercase text-blue-700">Janela analisada</p>
+            <p className="mt-1 font-mono text-xs text-blue-900">1979-01-01 → 2023-03-31</p>
+            <p className="mt-1 text-blue-800/90">
+              44,2 anos efetivos, 0,33% de falhas em vazão. Trecho 1970–1978 foi
+              truncado por conter platô artificial (cotas constantes) que
+              produzia eventos com coef. de escoamento &gt; 1.
+            </p>
           </div>
           <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
-            <p className="text-xs font-semibold uppercase text-emerald-700">Curva-chave (potência)</p>
-            <p className="mt-1 font-mono text-xs text-emerald-900">Q = a·(h − h₀)<sup>b</sup></p>
+            <p className="text-xs font-semibold uppercase text-emerald-700">
+              Curva-chave ajustada
+            </p>
+            <p className="mt-1 font-mono text-xs text-emerald-900">
+              Q = 3,0235·(h − 0,05)<sup>2,036</sup>
+            </p>
             <p className="mt-1 text-emerald-800/90">
-              Ajuste por LS não-linear (<code>scipy.optimize.curve_fit</code>) com h₀ estimado por
-              grid-search; resíduos validados por Kolmogorov-Smirnov.
+              R² = 0,943; RMSE = 1,35 m³/s; ajustada sobre 354 medições ANA na
+              faixa h ∈ [0,98; 3,48] m. Procedimento: grid-search de h₀ +
+              refino não-linear via <code>scipy.optimize.curve_fit</code>.
             </p>
           </div>
           <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
-            <p className="text-xs font-semibold uppercase text-amber-700">Seleção do exutório</p>
-            <p className="mt-1 text-amber-900/90">
-              Ranking por score composto{" "}
-              <span className="font-mono text-xs">
-                0.5·anos + 0.3·(1−falhas) + 0.2·proximidade
-              </span>
-              ; top-5 apresentadas em <a href="/selecao-fluvio" className="underline">/selecao-fluvio</a>.
+            <p className="text-xs font-semibold uppercase text-amber-700">
+              Endpoints REST
             </p>
+            <ul className="mt-1 list-disc pl-4 text-amber-900/90">
+              <li>HidroSerieVazao (m³/s)</li>
+              <li>HidroSerieCotas (cm)</li>
+              <li>HidroSerieResumoDescarga (medições)</li>
+              <li>HidroSerieCurvaDescarga (curva oficial ANA)</li>
+            </ul>
           </div>
         </div>
         <p className="mt-3 text-xs text-slate-500">
-          A migração para a API REST também passa a alimentar as séries pluviométricas
-          (<code className="rounded bg-slate-100 px-1 py-0.5">python pipeline.py --via rest</code>),
-          eliminando a necessidade de ZIPs baixados manualmente.
+          A curva ajustada preenche dias com cota observada mas vazão ausente
+          (559 dias na janela analisada). Cotas fora de [h_min, h_max] não são
+          extrapoladas. A inspeção das estações em uso está disponível em{" "}
+          <a href="/selecao-fluvio" className="underline">/selecao-fluvio</a>.
         </p>
+      </Secao>
+
+      {/* 6.5 (novo) — Parâmetros físicos da bacia */}
+      <Secao numero="6.5" titulo="Parâmetros físicos da bacia (CABra 318)">
+        <p className="text-sm text-slate-600">
+          Os parâmetros físicos da sub-bacia do Buquira até o exutório foram
+          extraídos do <strong>dataset CABra</strong> (Catchment Attributes for
+          Brazil, Almeida et al. 2021), catchment 318, complementados por
+          medição própria do talvegue principal sobre a rede de drenagem do
+          CABra recortada à bacia, executada no QGIS.
+        </p>
+        <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Área de drenagem</p>
+            <p className="mt-1 font-mono text-base text-slate-800">410,08 km²</p>
+            <p className="mt-1 text-xs text-slate-500">CABra; ANA reporta 407 km²</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Talvegue principal L</p>
+            <p className="mt-1 font-mono text-base text-slate-800">42,1 km</p>
+            <p className="mt-1 text-xs text-slate-500">Medido sobre CABra_drainage no QGIS</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Desnível Δh</p>
+            <p className="mt-1 font-mono text-base text-slate-800">1 163 m</p>
+            <p className="mt-1 text-xs text-slate-500">elev_max (1726) − elev_gauge (563)</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Declividade do canal</p>
+            <p className="mt-1 font-mono text-base text-slate-800">S = 2,76 %</p>
+            <p className="mt-1 text-xs text-slate-500">S = Δh / L (≠ catch_slope do terreno)</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Tempo de concentração</p>
+            <p className="mt-1 font-mono text-base text-slate-800">tc = 282,9 min</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Kirpich (4,7 h). W&Chow daria 10,2 h — sensibilidade documentada
+              no relatório.
+            </p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Curve Number AMC-II</p>
+            <p className="mt-1 font-mono text-base text-slate-800">CN = 60</p>
+            <p className="mt-1 text-xs text-slate-500">
+              NRCS TR-55 sobre uso/solo CABra (70% floresta, grupo B). Faixa
+              defensável: 56–62.
+            </p>
+          </div>
+        </div>
       </Secao>
 
       {/* 7. Regime de vazões — Fase 2 */}
@@ -411,29 +473,65 @@ export default function TransparenciaPage() {
       <Secao numero="8" titulo="Eventos chuva-vazão e hidrogramas unitários">
         <p className="text-sm text-slate-600">
           Identificação de eventos isolados e construção dos hidrogramas
-          unitários observado e SCS (referência: HID41_Projeto2_Metodologia,
-          etapas 3, 4 e 5; Collischonn & Dornelles cap. 18).
+          unitários observado e SCS triangular. Referência: Collischonn &
+          Dornelles (2013), cap. 18; HID41 — Projeto 2 etapas 3, 4 e 5.
         </p>
+
+        {/* Bloco P2 — NOVO */}
+        <div className="mt-3 rounded-lg border border-violet-100 bg-violet-50 p-3 text-sm">
+          <p className="text-xs font-semibold uppercase text-violet-700">
+            Pluviômetros do Projeto 2 (chuva sobre a bacia)
+          </p>
+          <p className="mt-1 text-violet-900/90">
+            Os pluviômetros do Projeto 1 (Pindamonhangaba, Estrada do Cunha e
+            SLP) estão a 51–90 km do exutório, no fundo do vale do Paraíba, e
+            não representam a chuva real sobre a bacia serrana do Buquira.
+            Para a Fase 3 foi criado um <strong>conjunto P2 independente</strong>{" "}
+            de pluviômetros mais próximos:
+          </p>
+          <ul className="mt-2 list-disc pl-5 text-violet-900/90">
+            <li><strong>2245054 — Monteiro Lobato</strong> (cabeceiras N, 22,6 km, CPRM)</li>
+            <li><strong>2345071 — Santa Branca</strong> (jusante leste, 27,2 km, CPRM)</li>
+            <li><strong>2345106 — UHE Santa Branca Barramento</strong> (jusante leste, 27,9 km, LIGHT)</li>
+          </ul>
+          <p className="mt-2 text-xs text-violet-800/80">
+            Chuva da bacia = média aritmética simples das séries diárias dos
+            três pluviômetros ativos (campos <code>config_pluviometros_p2</code>
+            no banco). O Projeto 1 é isolado tecnicamente por uma coluna{" "}
+            <code>projeto = 'P1'</code> em <code>estacoes</code>, com view{" "}
+            <code>resumo_estacoes</code> filtrada — as páginas pluviométricas
+            do BI permanecem intocadas.
+          </p>
+        </div>
+
         <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
           <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
-            <p className="text-xs font-semibold uppercase text-blue-700">Isolamento</p>
+            <p className="text-xs font-semibold uppercase text-blue-700">Isolamento de eventos</p>
             <p className="mt-1 text-blue-800/90">
               <code>scipy.signal.find_peaks</code> com proeminência mínima
-              relativa a Q95 e distância entre picos ≥ 5 dias; recuo até o
-              último mínimo local; término por base-time SCS{" "}
+              0,3·Q95 e distância entre picos ≥ 5 dias. Recuo até o último
+              mínimo local; término por base-time SCS{" "}
               <span className="font-mono">D = 0,827·A<sup>0,2</sup></span> dias.
               Base separada por reta linear entre extremos.
+            </p>
+            <p className="mt-1 text-blue-800/90">
+              <strong>Filtros adicionais:</strong> chuva acumulada ≥ 10 mm na
+              janela <em>lookback</em> de max(⌈D⌉, 3) dias antes do pico;
+              duração total em [D, D+2] dias. Resultado: <strong>457
+              eventos válidos</strong> isolados.
             </p>
           </div>
           <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
             <p className="text-xs font-semibold uppercase text-emerald-700">HU observado</p>
             <p className="mt-1 font-mono text-xs text-emerald-900">
-              u<sub>i</sub> = Q<sub>direto,i</sub> / h<sub>mm</sub>
+              u<sub>i</sub> = Q<sub>direto,i</sub> / h
             </p>
             <p className="mt-1 text-emerald-800/90">
-              Lâmina <span className="font-mono">h = V / A</span> em mm sobre a
-              bacia (V em m³, A em km²; 1 mm·km² = 1.000 m³). HU médio = média
-              das ordenadas alinhadas pelo pico.
+              Lâmina <span className="font-mono">h = V / A</span> em mm sobre
+              a bacia (V em m³, A em km²; 1 mm·km² = 1 000 m³). HU médio =
+              média ordenada-a-ordenada após alinhar individuais pelo pico.
+              Desvio padrão por ordenada documenta a variabilidade entre
+              eventos.
             </p>
           </div>
           <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
@@ -442,25 +540,31 @@ export default function TransparenciaPage() {
               tp = 0,6·tc · Tp = tp + d/2 · Qp = 0,208·A/Tp · tb = 2,67·Tp
             </p>
             <p className="mt-1 text-amber-800/90">
-              tc por Kirpich (bacias pequenas) ou Watt&Chow (até ≈ 5.840 km²).
-              Comparação obs × SCS via Nash-Sutcliffe, erro relativo no pico e
-              erro no tempo de pico.
+              <strong>Resultado:</strong> Tp = 3,62 h; Qp = 23,59 m³/s/mm;
+              tb = 9,65 h (com tc Kirpich = 283 min). HU observado em malha
+              diária (Δt = 1 d) e SCS em malha horária (Δt = 60 min) — a
+              comparação direta não é estatisticamente válida; cada um é
+              apresentado em painel próprio.
             </p>
           </div>
         </div>
-        <p className="mt-3 text-xs text-slate-500">
-          Parâmetros físicos da bacia (A, L, Δh, CN) ficam em{" "}
-          <code className="rounded bg-slate-100 px-1">config.yaml → bacia</code>.
-          Fase 3 é pulada se A_km² estiver vazio.
+
+        <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+          <strong>Chuva efetiva</strong> via método do{" "}
+          <span className="font-mono">φ-index</span>: bissecção de φ (mm/dia)
+          tal que <span className="font-mono">Σ max(P<sub>i</sub> − φ, 0) = h</span>.
+          Por construção, P<sub>efetiva</sub> ≡ h (lâmina escoada). Alternativa
+          SCS-CN disponível para análises de sensibilidade do CN.
         </p>
       </Secao>
 
       {/* 9. Eventos extremos — Fase 4 */}
       <Secao numero="9" titulo="Eventos extremos — frequência, IDF e chuva de projeto">
         <p className="text-sm text-slate-600">
-          Análise de frequência das vazões máximas anuais, curvas IDF regionais
-          e chuva de projeto pelo método dos blocos alternados (referência:
-          HID41_Projeto2_Metodologia, etapas 8, 9 e 10).
+          Análise de frequência das vazões máximas anuais, curva IDF para São
+          José dos Campos e chuva de projeto pelo método dos blocos
+          alternados. Referência: Collischonn & Dornelles (2013); Naghettini &
+          Pinto (2007).
         </p>
         <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
           <div className="rounded-lg border border-violet-100 bg-violet-50 p-3">
@@ -468,21 +572,34 @@ export default function TransparenciaPage() {
               Frequência de cheias
             </p>
             <p className="mt-1 text-violet-900/90">
-              Ajuste de 5 distribuições candidatas (Gumbel, GEV, LogNormal,
-              Pearson III, Log-Pearson III); seleção por <strong>AIC</strong>
-              com KS p-value como filtro de aderência. Quantis Q(TR) com IC 90%
-              via bootstrap paramétrico (1.000 reamostras).
+              Sobre 44 anos da AMS (filtro de 330 dias por ano), ajustam-se 5
+              distribuições candidatas: <strong>Gumbel, GEV, LogNormal,
+              Pearson III e Log-Pearson III</strong>. Critério: menor AIC{" "}
+              <em>entre as que passam no KS</em> (p ≥ 0,05). Todas passam;
+              recomendada: <strong>GEV</strong> (AIC = 353,87; KS p = 0,88).
+            </p>
+            <p className="mt-1 text-violet-900/90">
+              Q(TR) com IC 90% por <strong>bootstrap não-paramétrico</strong>
+              (1 000 reamostras com reposição da AMS observada; re-ajuste da
+              distribuição em cada amostra).
+              <span className="text-violet-800/80">
+                {" "}Q<sub>TR=100</sub> = 75,3 m³/s (IC: 64–94).
+              </span>
             </p>
           </div>
           <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
-            <p className="text-xs font-semibold uppercase text-amber-700">IDF regional</p>
+            <p className="text-xs font-semibold uppercase text-amber-700">IDF de São José dos Campos</p>
             <p className="mt-1 font-mono text-xs text-amber-900">
-              i = a · TR^b / (t<sub>d</sub> + c)^d
+              i = 5710 · TR<sup>0,1263</sup> / (t<sub>d</sub> + 38,21)<sup>1,0766</sup>
             </p>
             <p className="mt-1 text-amber-800/90">
-              Equação pré-publicada (Pfafstetter / DNOS para SJC adotado como
-              default; configurável em <code>config.yaml → idf.parametros</code>).
-              Plotada para TR ∈ &#123;2, 5, 10, 25, 50, 100, 500, 1000&#125;.
+              Fonte: <strong>Ferreira & Waltz (2001)</strong>, XIV Simpósio
+              Brasileiro de Recursos Hídricos. Validada contra a Tabela 6 do
+              paper em 5 pontos (desvio &lt; 1%).
+            </p>
+            <p className="mt-1 text-xs text-amber-800/70">
+              Faixa declarada: TR ≤ 20 anos, t ≤ 360 min. TR = 100 é
+              extrapolação documentada.
             </p>
           </div>
           <div className="rounded-lg border border-red-100 bg-red-50 p-3">
@@ -490,19 +607,83 @@ export default function TransparenciaPage() {
               Chuva de projeto (blocos alternados)
             </p>
             <p className="mt-1 text-red-900/90">
-              Para TR = 10 e TR = 100 anos: discretização Δt; intensidade pela
-              IDF em cada t<sub>k</sub>; ΔP<sub>k</sub> = P<sub>k</sub> −
-              P<sub>k−1</sub>; reorganização com maior bloco no centro (padrão
-              intermediário). Padrões adiantado e atrasado disponíveis para
-              sensibilidade.
+              Discretização Δt = 10 min; t<sub>d</sub> = 360 min (36 blocos).
+              Incrementos ΔP<sub>k</sub> = P<sub>k</sub> − P<sub>k−1</sub>
+              reorganizados em padrão <em>intermediário</em> (maior bloco no
+              centro, alternando antes/depois).
+            </p>
+            <p className="mt-1 font-mono text-xs text-red-900">
+              TR=10: P<sub>tot</sub> = 72,7 mm<br/>
+              TR=100: P<sub>tot</sub> = 97,3 mm
             </p>
           </div>
         </div>
+
+        {/* Ressalva orográfica — NOVO */}
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
+          <p className="text-xs font-semibold uppercase text-amber-800">
+            Limitação reconhecida — efeito orográfico
+          </p>
+          <p className="mt-1 text-amber-900/90">
+            A IDF de SJC é calibrada para postos pluviográficos no vale do
+            Paraíba do Sul, em altitude ~580 m. A bacia do Buquira é serrana:
+            cabeceiras nas vertentes da Serra da Mantiqueira a ~1 700 m
+            (Δz = 1 163 m em 42 km de talvegue). Pela <strong>influência
+            orográfica</strong>, intensidades reais nas cabeceiras são
+            tipicamente <strong>10–30% maiores</strong> que as previstas pela
+            IDF do vale (Bertoni & Tucci, 2007). A chuva de projeto TR = 100
+            deve ser interpretada como <strong>limite inferior</strong> das
+            intensidades reais nas cabeceiras; pendências metodológicas
+            (transposição altimétrica ou IDF local dos pluvios P2 via
+            desagregação) ficam para evolução futura do trabalho.
+          </p>
+        </div>
+
         <p className="mt-3 text-xs text-slate-500">
           Acoplamento opcional Fase 3 ↔ Fase 4: convoluir a chuva de projeto
-          com o HU SCS gera o <em>hidrograma de projeto</em>, que pode ser
-          comparado com Q(TR) da análise de frequência para validar coerência
-          entre os dois caminhos.
+          com o HU SCS gera o <em>hidrograma de projeto</em>, comparável com
+          Q(TR) da análise de frequência. O acoplamento exige desagregar a
+          chuva diária projetada em sub-passos compatíveis com o HU horário.
+        </p>
+      </Secao>
+
+      {/* 9.5 (novo) — Validação cruzada vs Parte 1 do projeto */}
+      <Secao numero="9.5" titulo="Validação cruzada vs Parte 1 do projeto (Excel)">
+        <p className="text-sm text-slate-600">
+          A planilha entregue na Parte 1 do projeto contém a Curva de
+          Permanência e o Filtro de Eckhardt da estação 58142200 na janela{" "}
+          <strong>1980-10-01 a 2010-09-30</strong> (30 anos hidrológicos).
+          Refizemos os mesmos cálculos no pipeline restringindo a mesma janela
+          e usando os mesmos parâmetros (α = 0,98; BFI_max = 0,80).
+        </p>
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <th className="px-3 py-2">Métrica</th>
+                <th className="px-3 py-2 text-right">Excel (Parte 1)</th>
+                <th className="px-3 py-2 text-right">Pipeline</th>
+                <th className="px-3 py-2 text-right">Desvio</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-700">
+              <tr className="border-b"><td className="px-3 py-1.5">Q5%</td><td className="px-3 py-1.5 text-right font-mono">21,32</td><td className="px-3 py-1.5 text-right font-mono">21,26</td><td className="px-3 py-1.5 text-right text-emerald-600">−0,26%</td></tr>
+              <tr className="border-b"><td className="px-3 py-1.5">Q10%</td><td className="px-3 py-1.5 text-right font-mono">16,37</td><td className="px-3 py-1.5 text-right font-mono">16,17</td><td className="px-3 py-1.5 text-right text-emerald-600">−1,27%</td></tr>
+              <tr className="border-b"><td className="px-3 py-1.5">Q50%</td><td className="px-3 py-1.5 text-right font-mono">7,65</td><td className="px-3 py-1.5 text-right font-mono">7,59</td><td className="px-3 py-1.5 text-right text-emerald-600">−0,68%</td></tr>
+              <tr className="border-b"><td className="px-3 py-1.5">Q90%</td><td className="px-3 py-1.5 text-right font-mono">4,45</td><td className="px-3 py-1.5 text-right font-mono">4,48</td><td className="px-3 py-1.5 text-right text-emerald-600">+0,56%</td></tr>
+              <tr className="border-b"><td className="px-3 py-1.5">Q95%</td><td className="px-3 py-1.5 text-right font-mono">3,96</td><td className="px-3 py-1.5 text-right font-mono">4,02</td><td className="px-3 py-1.5 text-right text-emerald-600">+1,67%</td></tr>
+              <tr className="border-b"><td className="px-3 py-1.5">Média</td><td className="px-3 py-1.5 text-right font-mono">9,34</td><td className="px-3 py-1.5 text-right font-mono">9,29</td><td className="px-3 py-1.5 text-right text-emerald-600">−0,52%</td></tr>
+              <tr className="border-b"><td className="px-3 py-1.5 font-semibold">BFI Eckhardt</td><td className="px-3 py-1.5 text-right font-mono">0,7548</td><td className="px-3 py-1.5 text-right font-mono">0,7425</td><td className="px-3 py-1.5 text-right text-emerald-600">−1,23 p.p.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          Todos os quantis com desvio &lt; 2% e BFI dentro de 1,3 p.p.: a
+          implementação do pipeline reproduz fielmente os resultados da Parte
+          1. Diferenças residuais provêm da inicialização do filtro recursivo
+          e da inclusão de dias preenchidos por curva-chave (não presentes no
+          Excel). Diferenças nas demais análises na janela completa do
+          pipeline (1979–2023) vêm da extensão temporal, não do método.
         </p>
       </Secao>
 
@@ -527,6 +708,110 @@ export default function TransparenciaPage() {
           </div>
         </Secao>
       )}
+
+      {/* Resultados-chave — NOVO */}
+      <Secao numero="11" titulo="Resultados-chave (sumário executivo)">
+        <p className="text-sm text-slate-600">
+          Síntese numérica dos principais parâmetros e resultados obtidos para
+          a estação <strong>58142200 — Buquirinha II</strong>, janela
+          1979-01-01 a 2023-03-31 (44,2 anos). Estes valores estão prontos
+          para o relatório final.
+        </p>
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <th className="px-3 py-2">Categoria</th>
+                <th className="px-3 py-2">Item</th>
+                <th className="px-3 py-2 text-right">Valor</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-700">
+              <tr className="border-b">
+                <td className="px-3 py-1.5 text-slate-500" rowSpan={6}>Bacia (CABra 318)</td>
+                <td className="px-3 py-1.5">Área de drenagem A</td>
+                <td className="px-3 py-1.5 text-right font-mono">410,08 km²</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">Comprimento do talvegue L</td>
+                <td className="px-3 py-1.5 text-right font-mono">42,1 km</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">Desnível Δh</td>
+                <td className="px-3 py-1.5 text-right font-mono">1 163 m</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">Declividade do canal S</td>
+                <td className="px-3 py-1.5 text-right font-mono">2,76 %</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">tc (Kirpich)</td>
+                <td className="px-3 py-1.5 text-right font-mono">282,9 min (4,7 h)</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">Curve Number AMC-II</td>
+                <td className="px-3 py-1.5 text-right font-mono">60</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5 text-slate-500" rowSpan={3}>Curva-chave</td>
+                <td className="px-3 py-1.5">Equação ajustada</td>
+                <td className="px-3 py-1.5 text-right font-mono">Q = 3,0235·(h−0,05)<sup>2,036</sup></td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">R² / RMSE</td>
+                <td className="px-3 py-1.5 text-right font-mono">0,943 / 1,35 m³/s</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">Medições usadas</td>
+                <td className="px-3 py-1.5 text-right font-mono">354 pontos</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5 text-slate-500" rowSpan={4}>Regime de vazões</td>
+                <td className="px-3 py-1.5">Q90 (vazão de outorga)</td>
+                <td className="px-3 py-1.5 text-right font-mono">3,99 m³/s</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">Q50 (mediana)</td>
+                <td className="px-3 py-1.5 text-right font-mono">6,99 m³/s</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">BFI Eckhardt (global)</td>
+                <td className="px-3 py-1.5 text-right font-mono">0,767</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">Q7,10 (LP3)</td>
+                <td className="px-3 py-1.5 text-right font-mono">2,68 m³/s</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5 text-slate-500" rowSpan={2}>Eventos & HU</td>
+                <td className="px-3 py-1.5">Eventos chuva-vazão isolados</td>
+                <td className="px-3 py-1.5 text-right font-mono">457</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">HU SCS (Tp / Qp / tb)</td>
+                <td className="px-3 py-1.5 text-right font-mono">3,62 h / 23,59 m³/s/mm / 9,65 h</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5 text-slate-500" rowSpan={4}>Frequência & chuva de projeto</td>
+                <td className="px-3 py-1.5">Distribuição recomendada</td>
+                <td className="px-3 py-1.5 text-right font-mono">GEV (AIC = 353,87)</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">Q TR=10 (IC 90%)</td>
+                <td className="px-3 py-1.5 text-right font-mono">57,8 m³/s [52,3 – 63,7]</td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5"><strong>Q TR=100 (IC 90%)</strong></td>
+                <td className="px-3 py-1.5 text-right font-mono"><strong>75,3 m³/s [64,0 – 93,7]</strong></td>
+              </tr>
+              <tr className="border-b">
+                <td className="px-3 py-1.5">P projeto TR=10 / TR=100 (td=360 min)</td>
+                <td className="px-3 py-1.5 text-right font-mono">72,7 mm / 97,3 mm</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Secao>
 
       {/* Glossário */}
       <section className="rounded-xl border bg-white p-5 shadow-sm">
