@@ -60,7 +60,24 @@ COR_ROXO  = "#7c3aed"
 
 OUTLET = "58142200"
 PLUVIOS_P1 = ["2245048", "2245055", "2345065"]
-PLUVIOS_P2 = ["2345019", "2345064", "2245054"]
+
+# Pluviometros P2 ativos vem dinamicamente do Supabase para refletir
+# a configuracao atual (substituiveis via /selecao-pluvio-p2).
+def _carregar_pluvios_p2_ativos() -> list[str]:
+    try:
+        r = client.table("config_pluviometros_p2").select("codigo").eq(
+            "ativo", True).execute().data
+        codigos = [str(x["codigo"]) for x in r if x.get("codigo")]
+        if codigos:
+            return codigos
+    except Exception as exc:
+        print(f"  warn: falhou ler config_pluviometros_p2: {exc}")
+    # Fallback hardcoded (config inicial do projeto)
+    return ["2345019", "2345064", "2245054"]
+
+
+PLUVIOS_P2 = _carregar_pluvios_p2_ativos()
+print(f"PLUVIOS_P2 ativos: {PLUVIOS_P2}")
 
 # ---------------------------------------------------------------------------
 # Helpers de leitura (lidam com paginacao do Supabase: limit default 1000)
@@ -742,7 +759,7 @@ def fig_p2_validacao_excel():
 
 
 def fig_p2_pluvio_anual():
-    """F15 — Total anual das 3 estacoes P2 (dentro/proximo da bacia).
+    """F15 — Total anual das estacoes P2 ativas.
 
     Filtra anos com cobertura >= 330 dias (≥90% do ano). Insere NaN nos
     anos faltantes para que a linha quebre visualmente (em vez de
@@ -754,10 +771,18 @@ def fig_p2_pluvio_anual():
         return
     df["data"] = pd.to_datetime(df["data"])
     df["ano"] = df["data"].dt.year
-    nomes = {"2245054": "Monteiro Lobato (22,6 km — cabeceiras)",
-             "2345064": "Buquirinha (1,3 km — dentro da bacia, histórica)",
-             "2345019": "São José dos Campos (7,0 km — foz)"}
-    cores = {"2245054": COR_AZUL, "2345064": COR_VERDE, "2345019": COR_AMBAR}
+
+    # Busca nome e distancia do banco para legenda dinamica
+    meta = client.table("estacoes_candidatas_pluvio_p2").select(
+        "codigo, nome, dist_exutorio_km").in_("codigo", PLUVIOS_P2).execute().data
+    nomes = {}
+    for m in meta:
+        nm = str(m.get("nome", m["codigo"])).strip().title()
+        d = float(m["dist_exutorio_km"]) if m.get("dist_exutorio_km") is not None else None
+        d_str = f"{d:.1f} km" if d is not None else "?"
+        nomes[str(m["codigo"])] = f"{nm} ({d_str})"
+    paleta = [COR_AZUL, COR_VERDE, COR_AMBAR, COR_ROXO, COR_VERMELHO]
+    cores = {cod: paleta[i % len(paleta)] for i, cod in enumerate(sorted(PLUVIOS_P2))}
 
     fig, ax = plt.subplots()
     # Range comum: do menor ao maior ano com dado VÁLIDO em qualquer estação
